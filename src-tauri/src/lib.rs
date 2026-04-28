@@ -48,8 +48,26 @@ lazy_static! {
 fn get_db_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     let app_dir = std::path::Path::new(&home).join(".bentossh");
-    std::fs::create_dir_all(&app_dir).ok();
-    app_dir.join("bentossh.db")
+    if !app_dir.exists() {
+        std::fs::create_dir_all(&app_dir).ok();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&app_dir, std::fs::Permissions::from_mode(0o700)).ok();
+        }
+    }
+    let db_path = app_dir.join("bentossh.db");
+    #[cfg(unix)]
+    {
+        if !db_path.exists() {
+            // Create empty file to set permissions before SQLite opens it
+            if let Ok(mut file) = std::fs::File::create(&db_path) {
+                use std::os::unix::fs::PermissionsExt;
+                file.set_permissions(std::fs::Permissions::from_mode(0o600)).ok();
+            }
+        }
+    }
+    db_path
 }
 
 fn init_db() -> Result<Connection, SshError> {
@@ -71,6 +89,12 @@ fn init_db() -> Result<Connection, SshError> {
 
 #[tauri::command]
 async fn ssh_connect(host: String, port: u16, username: String, password: Option<String>, key_path: Option<String>) -> Result<String, String> {
+    // SSRF Mitigation: Block sensitive internal ports
+    let blocked_ports = [21, 23, 25, 53, 80, 443, 3306, 5432, 6379, 8080, 8443];
+    if blocked_ports.contains(&port) {
+        return Err(format!("Connection to port {} is restricted for security.", port));
+    }
+
     let host_clone = host.clone();
     let username_clone = username.clone();
     tokio::task::spawn_blocking(move || -> Result<String, SshError> {
@@ -82,7 +106,19 @@ async fn ssh_connect(host: String, port: u16, username: String, password: Option
         if let Some(pass) = password {
             session.userauth_password(&username_clone, &pass)?;
         } else if let Some(key) = key_path {
-            session.userauth_pubkey_file(&username_clone, None, std::path::Path::new(&key), None)?;
+            let path = std::path::Path::new(&key);
+            
+            // Path Traversal Mitigation: Absolute path validation
+            let canonical_path = path.canonicalize().map_err(|_| SshError::AuthFailed("Invalid key path: file not found".into()))?;
+            let home = std::env::var("HOME").map(PathBuf::from).unwrap_or_default();
+            let ssh_dir = home.join(".ssh");
+            let app_dir = home.join(".bentossh");
+
+            if !canonical_path.starts_with(&ssh_dir) && !canonical_path.starts_with(&app_dir) {
+                 return Err(SshError::AuthFailed("Access denied: SSH keys must reside in ~/.ssh or ~/.bentossh".into()));
+            }
+
+            session.userauth_pubkey_file(&username_clone, None, &canonical_path, None)?;
         } else {
             return Err(SshError::AuthFailed(username_clone));
         };
@@ -213,7 +249,7 @@ async fn quick_action(session_id: String, action: String) -> Result<String, Stri
         let session = active.session.lock().unwrap();
 
         let command = match action.as_str() {
-            "restart_service" => "sudo systemctl restart --no-pager -l",
+            "restart_sshd" => "sudo systemctl restart sshd --no-pager -l",
             "tail_logs" => "tail -n 50 /var/log/syslog 2>/dev/null || tail -n 50 /var/log/messages 2>/dev/null || journalctl -n 50 --no-pager",
             "clear_cache" => "sync && echo 3 > /proc/sys/vm/drop_caches && echo 'Cache cleared'",
             _ => return Err(SshError::AuthFailed("Unknown action".to_string())),
@@ -325,3 +361,6 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests;
