@@ -29,7 +29,7 @@
 
 ```bash
 # Clone repo
-git clone https://github.com/yourusername/bentossh.git
+git clone https://github.com/pallab-js/BentoSSH.git
 cd bentossh
 
 # Install dependencies
@@ -108,6 +108,6 @@ GPL-3.0 — Open Source. Contributions welcome.
 
 ---
 
-**Status:** MVP Complete (Slices 1-5)  
-**Current Version:** 0.1.0  
-**Platforms:** macOS (M1 optimized), Linux, Windows
+**Status:** Production Ready (v1.0.0)  
+**Current Version:** 1.0.0  
+**Platforms:** macOS (Apple Silicon & Intel), Linux, Windows

@@ -1,111 +1,22 @@
-<script>
+<script lang="ts">
   import Terminal from '$lib/components/Terminal.svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { fade, fly } from 'svelte/transition';
-  import { quintOut } from 'svelte/easing';
-  import { Server, Zap, HardDrive, RefreshCw, Plus, Trash2, X, Command } from 'lucide-svelte';
+  import { X, Plus, Terminal as TerminalIcon, HardDrive, Zap, RefreshCw, Command, Activity } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
-  import { dndzone } from 'svelte-dnd-action';
-  import { flip } from 'svelte/animate';
+  import { onMount } from 'svelte';
+  import { uiState } from '$lib/state.svelte';
+  import { settingsState } from '$lib/settings.svelte';
 
-  let theme = $state('dark');
-  let hosts = $state([]);
-  let sessions = $state([]);
-  let activeSessionId = $state(null);
-  let connecting = $state(false);
-  let healthData = $state({}); // Map of sessionId to health
-  let showAddHost = $state(false);
+  import { sessionState } from '$lib/session.svelte';
+
   let newHost = $state({ name: '', ip: '', port: 22, username: '', password: '', keyPath: '' });
 
-  // Tiles now include dynamic terminals
-  let tiles = $state([
-    { id: 'health', cols: 4, rows: 2, title: 'Server Health' },
-    { id: 'actions', cols: 4, rows: 2, title: 'Quick Actions' },
-    { id: 'hosts', cols: 12, rows: 2, title: 'Pinned Hosts' }
-  ]);
-
-  const flipDurationMs = 200;
-
-  function handleDndConsider(e) {
-    tiles = e.detail.items;
+  async function connectToHost(host: any) {
+    await sessionState.connectToHost(host);
   }
 
-  function handleDndFinalize(e) {
-    tiles = e.detail.items;
-  }
-
-  async function loadHosts() {
-    try {
-      const rawHosts = await invoke('get_hosts');
-      hosts = rawHosts.map(h => ({
-        id: h[0],
-        name: h[1],
-        ip: h[2],
-        port: h[3],
-        username: h[4],
-        keychain_id: h[5],
-        last_connected: h[6]
-      }));
-    } catch (e) {
-      toast.error('Failed to load hosts: ' + e);
-    }
-  }
-
-  async function connectToHost(host) {
-    connecting = true;
-    try {
-      const [password, keyPath] = await invoke('get_host_creds', { id: host.id });
-      const sessionId = await invoke('ssh_connect', {
-        host: host.ip,
-        port: host.port,
-        username: host.username,
-        password: password || null,
-        keyPath: keyPath || null
-      });
-
-      const newSession = {
-        id: sessionId,
-        host,
-        status: 'connected',
-        creds: { password, keyPath }
-      };
-      
-      sessions = [...sessions, newSession];
-      activeSessionId = sessionId;
-      
-      // Add a terminal tile for this session
-      tiles = [{ id: `terminal-${sessionId}`, cols: 8, rows: 4, title: host.name, sessionId }, ...tiles];
-      
-      startHealthPolling(sessionId);
-      toast.success(`Connected to ${host.name}`);
-    } catch (e) {
-      toast.error('Connection failed: ' + e);
-    } finally {
-      connecting = false;
-    }
-  }
-
-  function startHealthPolling(sessionId) {
-    const poll = async () => {
-      if (!sessions.find(s => s.id === sessionId)) return;
-      try {
-        const [cpu, ram] = await invoke('get_server_health', { sessionId });
-        healthData = { ...healthData, [sessionId]: { cpu, ram } };
-      } catch (e) {
-        console.error('Health poll failed', e);
-      }
-      setTimeout(poll, 5000);
-    };
-    poll();
-  }
-
-  function removeSession(sessionId) {
-    sessions = sessions.filter(s => s.id !== sessionId);
-    tiles = tiles.filter(t => t.id !== `terminal-${sessionId}`);
-    if (activeSessionId === sessionId) {
-      activeSessionId = sessions[0]?.id || null;
-    }
-    invoke('ssh_disconnect', { sessionId }).catch(console.error);
+  function closeSession(sessionId: string) {
+    sessionState.closeSession(sessionId);
   }
 
   async function saveHost() {
@@ -118,277 +29,222 @@
         password: newHost.password || null,
         keyPath: newHost.keyPath || null
       });
-      showAddHost = false;
+      uiState.showAddHost = false;
       newHost = { name: '', ip: '', port: 22, username: '', password: '', keyPath: '' };
-      loadHosts();
+      // Refresh hosts in layout
+      window.dispatchEvent(new CustomEvent('refresh-hosts'));
       toast.success('Host saved successfully');
     } catch (e) {
       toast.error('Save host failed: ' + e);
     }
   }
 
-  async function deleteHost(id) {
+  async function handleQuickAction(action: string) {
+    if (!sessionState.activeSessionId) {
+      toast.error('No active session selected');
+      return;
+    }
     try {
-      await invoke('delete_host', { id });
-      hosts = hosts.filter(h => h.id !== id);
-      toast.success('Host deleted');
+      await invoke('quick_action', { sessionId: sessionState.activeSessionId, action });
+      toast.success(`Action '${action}' triggered`);
     } catch (e) {
-      toast.error('Delete host failed: ' + e);
+      toast.error('Action failed: ' + e);
     }
   }
 
-  $effect(() => { loadHosts(); });
+  function handleKeydown(e: KeyboardEvent) {
+    const newSessionKey = settingsState.current.keyboard.newSession.toLowerCase();
+    const closeSessionKey = settingsState.current.keyboard.closeSession.toLowerCase();
+
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === newSessionKey) {
+      e.preventDefault();
+      uiState.showAddHost = true;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === closeSessionKey) {
+      e.preventDefault();
+      if (sessionState.activeSessionId) closeSession(sessionState.activeSessionId);
+    }
+    if ((e.metaKey || e.ctrlKey) && (e.key === '[' || e.key === '{' || e.shiftKey && e.key === '[')) {
+      // Switch to previous tab
+      const idx = sessionState.sessions.findIndex(s => s.id === sessionState.activeSessionId);
+      if (idx > 0) sessionState.activeSessionId = sessionState.sessions[idx - 1].id;
+    }
+    if ((e.metaKey || e.ctrlKey) && (e.key === ']' || e.key === '}' || e.shiftKey && e.key === ']')) {
+      // Switch to next tab
+      const idx = sessionState.sessions.findIndex(s => s.id === sessionState.activeSessionId);
+      if (idx < sessionState.sessions.length - 1) sessionState.activeSessionId = sessionState.sessions[idx + 1].id;
+    }
+  }
+
+  onMount(() => {
+    const connectHandler = (e: any) => connectToHost(e.detail);
+    const showAddHandler = () => uiState.showAddHost = true;
+    const actionHandler = (e: any) => handleQuickAction(e.detail);
+
+    window.addEventListener('connect-host', connectHandler);
+    window.addEventListener('show-add-host', showAddHandler);
+    window.addEventListener('quick-action', actionHandler);
+
+    return () => {
+      window.removeEventListener('connect-host', connectHandler);
+      window.removeEventListener('show-add-host', showAddHandler);
+      window.removeEventListener('quick-action', actionHandler);
+    };
+  });
 </script>
 
-<div class="min-h-screen bg-base p-6 lg:p-12">
-  <!-- Header -->
-  <header class="mb-24 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <div class="w-8 h-8 bg-brand-green rounded-md flex items-center justify-center text-white">
-        <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current" xmlns="http://www.w3.org/2000/svg">
-          <path d="M21.362 9.354H12V.396L2.638 14.646H12v8.958z"/>
-        </svg>
-      </div>
-      <h1 class="text-xl font-medium tracking-tight text-text-primary">BentoSSH</h1>
-    </div>
-    
-    <div class="flex items-center gap-6">
-      {#if sessions.length > 0}
-        <div class="flex gap-1 bg-base border border-border-std p-1 rounded-full">
-          {#each sessions as session (session.id)}
-            <button
-              class="px-4 py-1.5 text-[13px] rounded-full transition-all font-medium {activeSessionId === session.id ? 'bg-brand-green text-base' : 'text-text-muted hover:text-text-primary'}"
-              onclick={() => activeSessionId = session.id}
-            >
-              {session.host.name}
-            </button>
-          {/each}
-        </div>
-      {/if}
-      <button class="btn-pill-primary" onclick={() => showAddHost = true}>
-        Start New Session
+<svelte:window onkeydown={handleKeydown} />
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  {#each sessionState.sessions as session (session.id)}
+    <div
+      role="button"
+      tabindex="0"
+      class="tab {sessionState.activeSessionId === session.id ? 'active' : ''}"
+      onclick={() => sessionState.activeSessionId = session.id}
+      onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') sessionState.activeSessionId = session.id; }}
+    >
+      <TerminalIcon size={12} class={sessionState.activeSessionId === session.id ? 'text-brand-green' : ''} />
+      <span class="truncate">{session.name}</span>
+      <button
+        type="button"
+        class="tab-close ml-auto hover:bg-white/10 rounded p-0.5"
+        onclick={(e) => { e.stopPropagation(); closeSession(session.id); }}
+      >
+        <X size={10} />
       </button>
     </div>
-  </header>
-
-  <!-- 12-Column Bento Grid -->
-  <section
-    class="grid grid-cols-12 gap-6"
-    use:dndzone={{ items: tiles, flipDurationMs, type: 'tiles' }}
-    onconsider={handleDndConsider}
-    onfinalize={handleDndFinalize}
+  {/each}
+  <button
+    class="px-3 flex items-center justify-center hover:bg-white/5 text-neutral-mid transition-colors"
+    onclick={() => uiState.showAddHost = true}
   >
-    {#each tiles as tile (tile.id)}
-      <div
-        class="glass flex flex-col group"
-        class:col-span-8={tile.cols === 8}
-        class:col-span-4={tile.cols === 4}
-        class:col-span-12={tile.cols === 12}
-        class:connection-active={tile.sessionId === activeSessionId}
-        style="grid-row: span {tile.rows};"
-        animate:flip={{ duration: flipDurationMs }}
-      >
-        <div class="flex items-center justify-between px-5 py-4 border-b border-border-std bg-base/50">
-           <div class="flex items-center gap-3">
-            <span class="font-mono-label">
-              {#if tile.id.startsWith('terminal')}
-                SESSION
-              {:else if tile.id === 'health'}
-                SYSTEM
-              {:else if tile.id === 'actions'}
-                EXEC
-              {:else}
-                NETWORK
-              {/if}
-            </span>
-            <h2 class="text-sm font-medium text-text-primary tracking-tight">
-              {tile.title}
-            </h2>
-          </div>
-          {#if tile.sessionId}
-            <button class="text-text-muted hover:text-red-500 transition-colors" onclick={() => removeSession(tile.sessionId)}>
-              <X size={16} />
-            </button>
-          {/if}
-        </div>
+    <Plus size={14} />
+  </button>
+</div>
 
-        <div class="p-5 flex-grow overflow-hidden">
-          {#if tile.id.startsWith('terminal')}
-            <div class="h-full rounded-lg overflow-hidden border border-border-std bg-surface">
-              <Terminal
-                visible={true}
-                autoConnectId={tile.sessionId}
-              />
-            </div>
-          {:else if tile.id === 'health'}
-            <!-- Server Health -->
-            <div class="space-y-6">
-              {#if activeSessionId && healthData[activeSessionId]}
-                <div class="grid grid-cols-1 gap-6">
-                  <div class="p-4 rounded-xl border border-border-std bg-base">
-                    <div class="font-mono-label mb-2">CPU Utilization</div>
-                    <div class="flex items-end justify-between">
-                      <div class="text-4xl font-normal text-brand-green">{healthData[activeSessionId].cpu}%</div>
-                      <div class="h-1 flex-grow mx-4 bg-border-std rounded-full overflow-hidden mb-2">
-                        <div class="h-full bg-brand-green" style="width: {healthData[activeSessionId].cpu}%"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="p-4 rounded-xl border border-border-std bg-base">
-                    <div class="font-mono-label mb-2">Memory Load</div>
-                    <div class="flex items-end justify-between">
-                      <div class="text-4xl font-normal text-brand-green">{healthData[activeSessionId].ram}%</div>
-                      <div class="h-1 flex-grow mx-4 bg-border-std rounded-full overflow-hidden mb-2">
-                        <div class="h-full bg-brand-green" style="width: {healthData[activeSessionId].ram}%"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              {:else}
-                <div class="flex flex-col items-center justify-center py-12 text-center">
-                  <HardDrive size={32} class="text-border-std mb-4" />
-                  <p class="text-sm text-text-muted">Select an active session to monitor health metrics.</p>
-                </div>
-              {/if}
-            </div>
-          {:else if tile.id === 'actions'}
-            <!-- Quick Actions -->
-            <div class="grid grid-cols-1 gap-3">
-              <button class="btn-pill-secondary w-full flex items-center justify-between disabled:opacity-30"
-                onclick={async () => {
-                  try {
-                    await invoke('quick_action', { sessionId: activeSessionId, action: 'restart_service' });
-                    toast.success('Service restart triggered');
-                  } catch (e) { toast.error('Action failed: ' + e); }
-                }}
-                disabled={!activeSessionId}
-              >
-                <span>Restart Service</span>
-                <Zap size={14} class="text-brand-green" />
-              </button>
-              <button class="btn-pill-secondary w-full flex items-center justify-between disabled:opacity-30"
-                onclick={async () => {
-                  try {
-                    await invoke('quick_action', { sessionId: activeSessionId, action: 'tail_logs' });
-                    toast.success('Log retrieval started');
-                  } catch (e) { toast.error('Action failed: ' + e); }
-                }}
-                disabled={!activeSessionId}
-              >
-                <span>Tail Syslog</span>
-                <RefreshCw size={14} class="text-brand-green" />
-              </button>
-              <button class="btn-pill-secondary w-full flex items-center justify-between disabled:opacity-30"
-                onclick={async () => {
-                  try {
-                    await invoke('quick_action', { sessionId: activeSessionId, action: 'clear_cache' });
-                    toast.success('Cache clearing initiated');
-                  } catch (e) { toast.error('Action failed: ' + e); }
-                }}
-                disabled={!activeSessionId}
-              >
-                <span>Clear Memory Cache</span>
-                <Command size={14} class="text-brand-green" />
-              </button>
-            </div>
-          {:else if tile.id === 'hosts'}
-            <!-- Pinned Hosts -->
-            <div class="flex gap-6 overflow-x-auto pb-4 px-1">
-              {#each hosts as host (host.id)}
-                <div class="relative group flex-shrink-0">
-                  <button
-                    class="w-[240px] p-6 rounded-2xl bg-base border border-border-std text-left hover:border-brand-green hover:bg-[#1c1c1c] transition-all"
-                    onclick={() => connectToHost(host)}
-                    disabled={connecting}
-                  >
-                    <div class="font-mono-label mb-3 text-[10px]">HOST</div>
-                    <div class="text-lg font-medium text-text-primary mb-1 tracking-tight truncate">{host.name}</div>
-                    <div class="text-sm text-text-muted font-mono">{host.username}@{host.ip}</div>
-                    
-                    {#if connecting && activeSessionId === null}
-                      <div class="absolute bottom-0 left-0 h-0.5 bg-brand-green animate-progress"></div>
-                    {/if}
-                  </button>
-                  <button
-                    class="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-surface border border-border-std text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:border-red-500 transition-all"
-                    onclick={(e) => { e.stopPropagation(); deleteHost(host.id); }}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              {/each}
-              
-              <button
-                class="w-[180px] p-6 rounded-2xl border-2 border-dashed border-border-std flex flex-col items-center justify-center text-text-muted hover:border-brand-green hover:text-brand-green transition-all flex-shrink-0 group"
-                onclick={() => showAddHost = true}
-              >
-                <Plus size={32} class="mb-2 group-hover:scale-110 transition-transform" />
-                <span class="font-mono-label text-[10px]">NEW HOST</span>
-              </button>
-            </div>
-          {/if}
+<!-- Terminal Area -->
+<div class="terminal-container">
+  {#if sessionState.sessions.length === 0}
+    <div class="absolute inset-0 flex flex-col items-center justify-center text-neutral-mid gap-12 bg-surface-dark">
+      <div class="flex flex-col items-center">
+        <div class="w-16 h-16 mb-8 text-brand-green">
+          <svg viewBox="0 0 24 24" class="w-full h-full fill-current" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21.362 9.354H12V.396L2.638 14.646H12v8.958z"/>
+          </svg>
+        </div>
+        <div class="text-center">
+          <h1 class="hero-text text-neutral-off-white mb-4">BentoSSH</h1>
+          <p class="text-[18px] text-neutral-mid font-sans max-w-md mx-auto leading-relaxed">
+            A premium, high-performance SSH client designed for the modern developer soul.
+          </p>
         </div>
       </div>
-    {/each}
-  </section>
-
-  <!-- Add Host Modal -->
-  {#if showAddHost}
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md" role="presentation" onclick={() => showAddHost = false}>
-      <div class="glass p-8 w-full max-w-xl bg-surface" role="presentation" onclick={(e) => e.stopPropagation()}>
-        <div class="flex justify-between items-center mb-8">
-          <div>
-            <span class="font-mono-label block mb-1">PROVISIONING</span>
-            <h3 class="text-2xl font-medium text-text-primary tracking-tight">Add New Host</h3>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl w-full px-8">
+        <div class="card flex flex-col gap-4 border-border-dark hover:border-border-std transition-colors">
+          <div class="mono-label">Quick Connect</div>
+          <div class="flex flex-col gap-2">
+            <button type="button" class="w-full flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std group cursor-pointer hover:border-brand-green/30" onclick={() => uiState.isPaletteOpen = true}>
+              <span class="text-sm">Search Saved Hosts</span>
+              <kbd class="text-[10px] text-neutral-dark font-mono group-hover:text-neutral-mid uppercase">⌘{settingsState.current.keyboard.commandPalette}</kbd>
+            </button>
+            <button type="button" class="w-full flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std group cursor-pointer hover:border-brand-green/30" onclick={() => uiState.showAddHost = true}>
+              <span class="text-sm">Create New Session</span>
+              <kbd class="text-[10px] text-neutral-dark font-mono group-hover:text-neutral-mid uppercase">⌘{settingsState.current.keyboard.newSession}</kbd>
+            </button>
           </div>
-          <button onclick={() => showAddHost = false} class="text-text-muted hover:text-text-primary"><X size={24} /></button>
         </div>
         
-        <div class="space-y-6">
-          <div class="grid grid-cols-2 gap-6">
-             <div class="col-span-2">
-              <label for="host-name" class="font-mono-label block mb-2">Display Name</label>
-              <input id="host-name" bind:value={newHost.name} class="w-full rounded-lg bg-base border border-border-std px-4 py-3 text-text-primary focus:border-brand-green outline-none transition-colors" placeholder="e.g. Production Cluster" />
+        <div class="card flex flex-col gap-4 border-border-dark hover:border-border-std transition-colors">
+          <div class="mono-label">Navigation</div>
+          <div class="flex flex-col gap-2">
+            <div class="flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std">
+              <span class="text-sm">Switch Active Tabs</span>
+              <kbd class="text-[10px] text-neutral-dark font-mono">⌘⇧[ / ]</kbd>
             </div>
-            <div class="col-span-2">
-              <label for="host-ip" class="font-mono-label block mb-2">Hostname / IPv4 / IPv6</label>
-              <input id="host-ip" bind:value={newHost.ip} class="w-full rounded-lg bg-base border border-border-std px-4 py-3 text-text-primary focus:border-brand-green outline-none transition-colors" placeholder="ssh.domain.com" />
-            </div>
-            <div>
-              <label for="host-port" class="font-mono-label block mb-2">SSH Port</label>
-              <input id="host-port" bind:value={newHost.port} type="number" class="w-full rounded-lg bg-base border border-border-std px-4 py-3 text-text-primary focus:border-brand-green outline-none" />
-            </div>
-            <div>
-              <label for="host-username" class="font-mono-label block mb-2">Username</label>
-              <input id="host-username" bind:value={newHost.username} class="w-full rounded-lg bg-base border border-border-std px-4 py-3 text-text-primary focus:border-brand-green outline-none" placeholder="root" />
+            <div class="flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std">
+              <span class="text-sm">Close Current Session</span>
+              <kbd class="text-[10px] text-neutral-dark font-mono uppercase">⌘{settingsState.current.keyboard.closeSession}</kbd>
             </div>
           </div>
-          
-          <div class="pt-4 border-t border-border-std">
-            <label for="host-password" class="font-mono-label block mb-2">Authentication Password</label>
-            <input id="host-password" bind:value={newHost.password} type="password" class="w-full rounded-lg bg-base border border-border-std px-4 py-3 text-text-primary focus:border-brand-green outline-none" placeholder="••••••••••••" />
-          </div>
-
-          <div>
-            <label for="host-keypath" class="font-mono-label block mb-2">Private Key Identity Path</label>
-            <input id="host-keypath" bind:value={newHost.keyPath} class="w-full rounded-lg bg-base border border-border-std px-4 py-3 text-text-primary focus:border-brand-green outline-none" placeholder="~/.ssh/id_rsa" />
-          </div>
-
-          <button class="btn-pill-primary w-full py-4 text-lg mt-6" onclick={saveHost}>
-            Save Host Configuration
-          </button>
         </div>
       </div>
+
+      <button class="btn-primary-pill" onclick={() => uiState.showAddHost = true}>
+        Start your project
+      </button>
     </div>
+  {:else}
+    {#each sessionState.sessions as session (session.id)}
+      <div class="h-full {sessionState.activeSessionId === session.id ? 'block' : 'hidden'}">
+        <Terminal
+          visible={sessionState.activeSessionId === session.id}
+          autoConnectId={session.id}
+        />
+        
+        <!-- Status Overlay -->
+        {#if sessionState.healthData[session.id]}
+          <div class="absolute bottom-6 right-6 flex gap-3 pointer-events-none">
+            <div class="bg-surface-near-black/80 backdrop-blur-md border border-border-std rounded-comfortable px-3 py-1.5 flex items-center gap-2 text-[11px]">
+              <Activity size={10} class="text-brand-green" />
+              <span class="text-neutral-mid uppercase tracking-wider font-mono">CPU</span>
+              <span class="font-mono text-neutral-off-white">{sessionState.healthData[session.id].cpu}%</span>
+            </div>
+            <div class="bg-surface-near-black/80 backdrop-blur-md border border-border-std rounded-comfortable px-3 py-1.5 flex items-center gap-2 text-[11px]">
+              <HardDrive size={10} class="text-brand-link" />
+              <span class="text-neutral-mid uppercase tracking-wider font-mono">RAM</span>
+              <span class="font-mono text-neutral-off-white">{sessionState.healthData[session.id].ram}%</span>
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/each}
   {/if}
 </div>
 
-<style>
-  @keyframes progress {
-    0% { width: 0; }
-    100% { width: 100%; }
-  }
-  .animate-progress {
-    animation: progress 2s ease-out forwards;
-  }
-</style>
+<!-- Add Host Modal -->
+{#if uiState.showAddHost}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="fixed inset-0 z-[101] flex items-center justify-center bg-black/60 backdrop-blur-sm" onclick={() => uiState.showAddHost = false}>
+    <div class="bg-surface-dark border border-border-std rounded-large w-[480px] shadow-2xl overflow-hidden" onclick={(e) => e.stopPropagation()}>
+      <div class="px-6 py-4 border-b border-border-dark flex justify-between items-center">
+        <h3 class="card-title text-[18px]">New SSH Connection</h3>
+        <button onclick={() => uiState.showAddHost = false} class="text-neutral-mid hover:text-neutral-off-white transition-colors"><X size={18} /></button>
+      </div>
+      
+      <div class="p-6 space-y-5">
+        <div class="flex flex-col gap-1.5">
+          <label for="host-name" class="mono-label text-[10px]">Session Label</label>
+          <input id="host-name" bind:value={newHost.name} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="e.g. Production API" />
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label for="host-ip" class="mono-label text-[10px]">Host Address</label>
+          <input id="host-ip" bind:value={newHost.ip} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="10.0.1.1 or example.com" />
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1.5">
+            <label for="host-user" class="mono-label text-[10px]">Username</label>
+            <input id="host-user" bind:value={newHost.username} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="root" />
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label for="host-port" class="mono-label text-[10px]">Port</label>
+            <input id="host-port" type="number" bind:value={newHost.port} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="22" />
+          </div>
+        </div>
+        <div class="flex flex-col gap-1.5 pt-2 border-t border-border-dark">
+          <label for="host-pass" class="mono-label text-[10px]">Authentication</label>
+          <input id="host-pass" type="password" bind:value={newHost.password} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="Password or Key Passphrase" />
+        </div>
+      </div>
+      
+      <div class="px-6 py-4 bg-surface-near-black border-t border-border-dark flex justify-end gap-3">
+        <button class="btn-ghost px-4" onclick={() => uiState.showAddHost = false}>Cancel</button>
+        <button class="btn-primary-pill !px-6 !py-1.5" onclick={saveHost}>Connect Session</button>
+      </div>
+    </div>
+  </div>
+{/if}
+

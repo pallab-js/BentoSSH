@@ -2,7 +2,7 @@
 
 use ssh2::Session;
 use std::net::TcpStream;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -28,14 +28,31 @@ pub enum SshError {
 
 impl From<SshError> for String {
     fn from(err: SshError) -> Self {
-        err.to_string()
+        match err {
+            SshError::Connection(_) => "Connection failed. Please check host and port.".to_string(),
+            SshError::Tcp(_) => "Network error. Please check your internet connection.".to_string(),
+            SshError::AuthFailed(msg) => format!("Authentication failed: {}", msg),
+            SshError::Database(_) => "Internal database error.".to_string(),
+            SshError::Keyring(_) => "Security storage error.".to_string(),
+        }
     }
+}
+
+#[derive(serde::Serialize)]
+struct SavedHost {
+    id: i32,
+    name: String,
+    ip: String,
+    port: i32,
+    username: String,
+    keychain_entry_id: Option<String>,
+    last_connected: Option<String>,
 }
 
 struct ActiveSession {
     session_id: String,
-    host: String,
-    username: String,
+    _host: String,
+    _username: String,
     session: Arc<Mutex<Session>>,
     channel: Arc<Mutex<ssh2::Channel>>,
 }
@@ -61,7 +78,7 @@ fn get_db_path() -> PathBuf {
     {
         if !db_path.exists() {
             // Create empty file to set permissions before SQLite opens it
-            if let Ok(mut file) = std::fs::File::create(&db_path) {
+            if let Ok(file) = std::fs::File::create(&db_path) {
                 use std::os::unix::fs::PermissionsExt;
                 file.set_permissions(std::fs::Permissions::from_mode(0o600)).ok();
             }
@@ -87,11 +104,40 @@ fn init_db() -> Result<Connection, SshError> {
     Ok(conn)
 }
 
+fn is_port_blocked(port: u16) -> bool {
+    // SSRF Mitigation: Block sensitive internal ports and range of common non-SSH ports
+    let blocked_ports = [
+        21, 23, 25, 53, 80, 443, 3306, 5432, 6379, 8080, 8443, // Common services
+        161, 162, // SNMP
+        445, 137, 138, 139, // SMB/NetBIOS
+        5060, 5061, // SIP
+    ];
+    blocked_ports.contains(&port)
+}
+
+fn validate_key_path(path: &Path) -> Result<PathBuf, SshError> {
+    let canonical_path = path.canonicalize().map_err(|_| SshError::AuthFailed("Invalid key path: file not found".into()))?;
+    
+    let home = std::env::var("HOME").map(PathBuf::from).ok();
+    let ssh_dir = home.as_ref().map(|h| h.join(".ssh"));
+    let app_dir = home.as_ref().map(|h| h.join(".bentossh"));
+
+    let is_allowed = match (ssh_dir, app_dir) {
+        (Some(s), Some(a)) => canonical_path.starts_with(s) || canonical_path.starts_with(a),
+        (Some(s), None) => canonical_path.starts_with(s),
+        (None, Some(a)) => canonical_path.starts_with(a),
+        (None, None) => false,
+    };
+
+    if !is_allowed {
+         return Err(SshError::AuthFailed("Access denied: SSH keys must reside in ~/.ssh or ~/.bentossh".into()));
+    }
+    Ok(canonical_path)
+}
+
 #[tauri::command]
 async fn ssh_connect(host: String, port: u16, username: String, password: Option<String>, key_path: Option<String>) -> Result<String, String> {
-    // SSRF Mitigation: Block sensitive internal ports
-    let blocked_ports = [21, 23, 25, 53, 80, 443, 3306, 5432, 6379, 8080, 8443];
-    if blocked_ports.contains(&port) {
+    if is_port_blocked(port) {
         return Err(format!("Connection to port {} is restricted for security.", port));
     }
 
@@ -106,21 +152,11 @@ async fn ssh_connect(host: String, port: u16, username: String, password: Option
         if let Some(pass) = password {
             session.userauth_password(&username_clone, &pass)?;
         } else if let Some(key) = key_path {
-            let path = std::path::Path::new(&key);
-            
-            // Path Traversal Mitigation: Absolute path validation
-            let canonical_path = path.canonicalize().map_err(|_| SshError::AuthFailed("Invalid key path: file not found".into()))?;
-            let home = std::env::var("HOME").map(PathBuf::from).unwrap_or_default();
-            let ssh_dir = home.join(".ssh");
-            let app_dir = home.join(".bentossh");
-
-            if !canonical_path.starts_with(&ssh_dir) && !canonical_path.starts_with(&app_dir) {
-                 return Err(SshError::AuthFailed("Access denied: SSH keys must reside in ~/.ssh or ~/.bentossh".into()));
-            }
-
+            let path = std::path::PathBuf::from(key);
+            let canonical_path = validate_key_path(&path)?;
             session.userauth_pubkey_file(&username_clone, None, &canonical_path, None)?;
         } else {
-            return Err(SshError::AuthFailed(username_clone));
+            return Err(SshError::AuthFailed("No credentials provided".into()));
         };
 
         let mut channel = session.channel_session()?;
@@ -135,8 +171,8 @@ async fn ssh_connect(host: String, port: u16, username: String, password: Option
         let mut sessions = SESSIONS.lock().unwrap();
         sessions.push(ActiveSession {
             session_id: session_id.clone(),
-            host: host_clone,
-            username: username_clone,
+            _host: host_clone,
+            _username: username_clone,
             session: session_arc.clone(),
             channel: channel_arc.clone(),
         });
@@ -157,7 +193,7 @@ async fn ssh_connect(host: String, port: u16, username: String, password: Option
                     Ok(n) if n > 0 => {
                         let output = String::from_utf8_lossy(&buf[..n]).to_string();
                         if let Some(ref app_handle) = app_handle_clone {
-                            let _ = app_handle.emit_str(&format!("ssh-output-{}", sid), output);
+                            let _ = app_handle.emit(&format!("ssh-output-{}", sid), output);
                         }
                     }
                     Ok(_) => break,
@@ -195,7 +231,7 @@ async fn ssh_resize(session_id: String, cols: u32, rows: u32) -> Result<(), Stri
         for session in sessions.iter() {
             if session.session_id == session_id {
                 let mut channel = session.channel.lock().unwrap();
-                channel.request_pty_size(cols as u32, rows as u32, None, None)?;
+                channel.request_pty_size(cols, rows, None, None)?;
                 return Ok(());
             }
         }
@@ -292,12 +328,20 @@ async fn save_host(name: String, ip: String, port: i32, username: String, passwo
 }
 
 #[tauri::command]
-async fn get_hosts() -> Result<Vec<(i32, String, String, i32, String, Option<String>, Option<String>)>, String> {
-    tokio::task::spawn_blocking(|| -> Result<Vec<(i32, String, String, i32, String, Option<String>, Option<String>)>, SshError> {
+async fn get_hosts() -> Result<Vec<SavedHost>, String> {
+    tokio::task::spawn_blocking(|| -> Result<Vec<SavedHost>, SshError> {
         let conn = init_db()?;
         let mut stmt = conn.prepare("SELECT id, name, ip, port, username, keychain_entry_id, last_connected FROM hosts ORDER BY last_connected DESC")?;
         let host_iter = stmt.query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?))
+            Ok(SavedHost {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                ip: row.get(2)?,
+                port: row.get(3)?,
+                username: row.get(4)?,
+                keychain_entry_id: row.get(5)?,
+                last_connected: row.get(6)?,
+            })
         })?;
         let mut hosts = Vec::new();
         for host in host_iter {
@@ -319,28 +363,34 @@ async fn delete_host(id: i32) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn get_host_creds(id: i32) -> Result<(Option<String>, Option<String>), String> {
-    tokio::task::spawn_blocking(move || -> Result<(Option<String>, Option<String>), SshError> {
+async fn connect_saved_host(id: i32) -> Result<String, String> {
+    let (ip, port, username, entry_id) = tokio::task::spawn_blocking(move || -> Result<(String, u16, String, Option<String>), SshError> {
         let conn = init_db()?;
-        let mut stmt = conn.prepare("SELECT keychain_entry_id FROM hosts WHERE id = ?")?;
+        let mut stmt = conn.prepare("SELECT ip, port, username, keychain_entry_id FROM hosts WHERE id = ?")?;
         let mut rows = stmt.query(params![id])?;
         if let Some(row) = rows.next()? {
-            let entry_id: Option<String> = row.get(0)?;
-            if let Some(ref eid) = entry_id {
-                let pass = keyring::Entry::new("bentossh:pass", eid)?.get_password().ok();
-                let key = keyring::Entry::new("bentossh:key", eid)?.get_password().ok();
-                return Ok((pass, key));
-            }
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        } else {
+            Err(SshError::AuthFailed("Host not found".to_string()))
         }
-        Ok((None, None))
-    }).await.map_err(|e| e.to_string())
-    .and_then(|r| r.map_err(|e| e.to_string()))
+    }).await.map_err(|e| e.to_string())?.map_err(|e: SshError| String::from(e))?;
+
+    let (password, key_path) = if let Some(ref eid) = entry_id {
+        let p = keyring::Entry::new("bentossh:pass", eid).and_then(|e| e.get_password()).ok();
+        let k = keyring::Entry::new("bentossh:key", eid).and_then(|e| e.get_password()).ok();
+        (p, k)
+    } else {
+        (None, None)
+    };
+
+    ssh_connect(ip, port, username, password, key_path).await
 }
 
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let mut handle = APP_HANDLE.lock().unwrap();
             *handle = Some(app.handle().clone());
@@ -356,7 +406,7 @@ pub fn run() {
             save_host,
             get_hosts,
             delete_host,
-            get_host_creds
+            connect_saved_host
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
