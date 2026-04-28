@@ -1,0 +1,153 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Source+Code+Pro:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Backgrounds */
+  --color-base: #171717;
+  --color-surface: #0f0f0f;
+  
+  /* Borders */
+  --color-border-subtle: #242424;
+  --color-border-std: #2e2e2e;
+  --color-border-heavy: #363636;
+  --color-border-accent: rgba(62, 207, 142, 0.3);
+  
+  /* Accents */
+  --color-accent-green: #3ecf8e;
+  --color-accent-link: #00c573;
+  
+  /* Text */
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #b4b4b4;
+  --color-text-muted: #898989;
+}
+
+body {
+  background-color: var(--color-base);
+  color: var(--color-text-primary);
+  margin: 0;
+  font-family: 'Circular', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Typography Utility */
+.font-mono-label {
+  font-family: 'Source Code Pro', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--color-text-muted);
+}
+
+.text-hero {
+  font-size: 72px;
+  line-height: 1.00;
+  letter-spacing: -0.02em;
+}
+
+/* Surfaces */
+.glass {
+  background: rgba(41, 41, 41, 0.84);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-border-std);
+  border-radius: 12px;
+  transition: border-color 0.2s ease;
+}
+
+.glass:hover {
+  border-color: var(--color-border-heavy);
+}
+
+/* Borders Hierarchy (No Shadows) */
+.border-subtle { border: 1px solid var(--color-border-subtle); }
+.border-std { border: 1px solid var(--color-border-std); }
+.border-heavy { border: 1px solid var(--color-border-heavy); }
+.border-accent { border: 1px solid var(--color-border-accent); }
+
+/* Primary Pill Button */
+.btn-pill-primary {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-text-primary);
+  border-radius: 9999px;
+  padding: 8px 32px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.btn-pill-primary:hover {
+  background-color: var(--color-text-primary);
+  color: var(--color-surface);
+}
+
+/* Secondary Pill Button */
+.btn-pill-secondary {
+  background-color: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-std);
+  border-radius: 9999px;
+  padding: 8px 32px;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+}
+
+.btn-pill-secondary:hover {
+  opacity: 1;
+  border-color: var(--color-border-heavy);
+}
+
+/* Active State Glow (Green Accent) */
+@keyframes green-glow {
+  0%, 100% { border-color: var(--color-border-accent); box-shadow: 0 0 15px rgba(62, 207, 142, 0.1); }
+  50% { border-color: var(--color-accent-green); box-shadow: 0 0 25px rgba(62, 207, 142, 0.2); }
+}
+
+.connection-active {
+  animation: green-glow 2s ease-in-out infinite;
+  border-color: var(--color-accent-green);
+}
+
+/* Pulse Error (Tomato/Crimson) */
+@keyframes pulse-error {
+  0%, 100% { border-color: var(--color-border-std); }
+  50% { border-color: #f87171; }
+}
+
+.connection-error {
+  animation: pulse-error 1.5s ease-in-out infinite;
+}
+
+/* Connecting Pulse */
+@keyframes pulse-connect {
+  0%, 100% { border-color: var(--color-border-std); }
+  50% { border-color: var(--color-accent-green); }
+}
+
+.connection-pulse {
+  animation: pulse-connect 1.5s ease-in-out infinite;
+}
+
+/* Custom Scrollbar (Supabase Style) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-heavy);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
