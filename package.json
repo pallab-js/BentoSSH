@@ -18,7 +18,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "test": "npm run test:rust",
+    "test:rust": "cd src-tauri && cargo test"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "3.0.10",

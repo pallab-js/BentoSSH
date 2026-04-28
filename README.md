@@ -39,6 +39,13 @@ npm install
 npm run tauri:dev
 ```
 
+### Testing
+
+```bash
+# Run backend integration tests
+npm test
+```
+
 ### Build
 
 ```bash
@@ -54,7 +61,8 @@ npm run tauri:build
 bentossh/
 ├── src-tauri/          # Rust backend
 │   ├── src/
-│   │   └── lib.rs     # Tauri commands (ssh_connect, etc.)
+│   │   ├── lib.rs     # Tauri commands (ssh_connect, etc.)
+│   │   └── tests.rs    # Backend integration tests
 │   └── Cargo.toml
 ├── src/                # SvelteKit frontend
 │   ├── routes/
@@ -84,8 +92,11 @@ bentossh/
 ## Security
 
 - **Zero-Trust Storage** — Host metadata in SQLite. Passwords/keys in OS keychain only.
-- **Isolation Pattern** — Frontend can only call declared `#[tauri::command]` functions
-- **No Telemetry** — App runs fully local. No data leaves your machine
+- **Isolation Pattern** — Frontend can only call declared `#[tauri::command]` functions.
+- **Path Traversal Protection** — SSH key paths are strictly validated and restricted to `~/.ssh` or the app's internal directory.
+- **SSRF Mitigation** — Outbound SSH connections are restricted for sensitive internal ports to prevent network scanning.
+- **Restricted Permissions** — Application data directory (`~/.bentossh`) and database file are created with strict `0700` and `0600` permissions on Unix systems.
+- **No Telemetry** — App runs fully local. No data leaves your machine.
 
 ## Contributing
 
