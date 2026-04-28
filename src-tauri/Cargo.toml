@@ -1,9 +1,11 @@
 [package]
 name = "bentossh"
 version = "0.1.0"
-description = "Modern SSH client with Bento Grid UI"
+description = "A modern, privacy-first SSH client built with Rust, Tauri, and SvelteKit."
 authors = ["Pallab"]
 edition = "2021"
+keywords = ["ssh", "tauri", "terminal"]
+categories = ["command-line-utilities"]
 
 [[bin]]
 name = "bentossh"

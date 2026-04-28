@@ -1,7 +1,16 @@
 {
   "name": "bentossh",
   "version": "0.1.0",
+  "description": "A modern, privacy-first SSH client built with Rust, Tauri, and SvelteKit.",
   "private": true,
+  "keywords": [
+    "ssh",
+    "terminal",
+    "tauri",
+    "rust",
+    "svelte",
+    "privacy"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite dev",
