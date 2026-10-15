@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'svelte-sonner';
+import { settingsState } from '$lib/settings.svelte';
 
 export interface Session {
   id: string;
@@ -70,9 +71,11 @@ function createSessionState() {
         
         sessions = [...sessions, newSession];
         activeSessionId = sessionId;
-        
+
         startHealthPolling(sessionId);
-        toast.success(`Connected to ${host.name}`);
+        if (settingsState.current.notifications.connectionAlerts) {
+          toast.success(`Connected to ${host.name}`);
+        }
         return sessionId;
       } catch (e) {
         toast.error('Connection failed: ' + e);

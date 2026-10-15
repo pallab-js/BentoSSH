@@ -256,23 +256,6 @@
                   </div>
                 </div>
               </section>
-
-              <section class="pt-6 border-t border-border-dark">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <h4 class="mono-label text-[10px] text-neutral-mid">Paste on Right Click</h4>
-                    <p class="text-xs text-neutral-dark mt-1">Instantly paste clipboard content on mouse right click.</p>
-                  </div>
-                  <button 
-                    class="w-10 h-5 rounded-full transition-colors relative {settingsState.current.keyboard.pasteOnRightClick ? 'bg-brand-green' : 'bg-neutral-dark'}"
-                    onclick={() => settingsState.current.keyboard.pasteOnRightClick = !settingsState.current.keyboard.pasteOnRightClick}
-                    aria-label="Toggle Paste on Right Click"
-                    aria-pressed={settingsState.current.keyboard.pasteOnRightClick}
-                  >
-                    <div class="absolute top-1 w-3 h-3 bg-white rounded-full transition-all {settingsState.current.keyboard.pasteOnRightClick ? 'left-6' : 'left-1'}"></div>
-                  </button>
-                </div>
-              </section>
             </div>
           {:else if activeTab === 'notifications'}
             <div class="space-y-8">
@@ -280,7 +263,7 @@
                 <div class="flex items-center justify-between">
                   <div>
                     <h4 class="mono-label text-[10px] text-neutral-mid">Connection Alerts</h4>
-                    <p class="text-xs text-neutral-dark mt-1">Show desktop notifications for connection events.</p>
+                    <p class="text-xs text-neutral-dark mt-1">Show a toast when a session connects or disconnects.</p>
                   </div>
                   <button 
                     class="w-10 h-5 rounded-full transition-colors relative {settingsState.current.notifications.connectionAlerts ? 'bg-brand-green' : 'bg-neutral-dark'}"
@@ -289,36 +272,6 @@
                     aria-pressed={settingsState.current.notifications.connectionAlerts}
                   >
                     <div class="absolute top-1 w-3 h-3 bg-white rounded-full transition-all {settingsState.current.notifications.connectionAlerts ? 'left-6' : 'left-1'}"></div>
-                  </button>
-                </div>
-
-                <div class="flex items-center justify-between">
-                  <div>
-                    <h4 class="mono-label text-[10px] text-neutral-mid">Terminal Bell</h4>
-                    <p class="text-xs text-neutral-dark mt-1">Play a sound when the terminal bell is triggered.</p>
-                  </div>
-                  <button 
-                    class="w-10 h-5 rounded-full transition-colors relative {settingsState.current.notifications.terminalBell ? 'bg-brand-green' : 'bg-neutral-dark'}"
-                    onclick={() => settingsState.current.notifications.terminalBell = !settingsState.current.notifications.terminalBell}
-                    aria-label="Toggle Terminal Bell"
-                    aria-pressed={settingsState.current.notifications.terminalBell}
-                  >
-                    <div class="absolute top-1 w-3 h-3 bg-white rounded-full transition-all {settingsState.current.notifications.terminalBell ? 'left-6' : 'left-1'}"></div>
-                  </button>
-                </div>
-
-                <div class="flex items-center justify-between">
-                  <div>
-                    <h4 class="mono-label text-[10px] text-neutral-mid">Command Completion</h4>
-                    <p class="text-xs text-neutral-dark mt-1">Notify when a long-running background command finishes.</p>
-                  </div>
-                  <button 
-                    class="w-10 h-5 rounded-full transition-colors relative {settingsState.current.notifications.commandFinished ? 'bg-brand-green' : 'bg-neutral-dark'}"
-                    onclick={() => settingsState.current.notifications.commandFinished = !settingsState.current.notifications.commandFinished}
-                    aria-label="Toggle Command Completion Notifications"
-                    aria-pressed={settingsState.current.notifications.commandFinished}
-                  >
-                    <div class="absolute top-1 w-3 h-3 bg-white rounded-full transition-all {settingsState.current.notifications.commandFinished ? 'left-6' : 'left-1'}"></div>
                   </button>
                 </div>
               </div>
@@ -335,20 +288,20 @@
                 <p class="text-sm text-neutral-mid mt-1">Version 0.1.0 (Alpha)</p>
               </div>
               <p class="text-sm text-neutral-dark max-w-sm">
-                A premium, privacy-first SSH client designed for the modern developer soul. Built with Rust, Tauri, and Svelte.
+                A modern, privacy-first SSH client. Built with Rust, Tauri, and Svelte.
               </p>
               <div class="flex gap-4">
-                <a href="https://github.com/bentossh/bentossh" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-surface-near-black border border-border-dark rounded-std text-xs text-neutral-mid hover:text-neutral-off-white hover:border-border-std transition-all">
+                <a href="https://github.com/pallab-js/BentoSSH" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-4 py-2 bg-surface-near-black border border-border-dark rounded-std text-xs text-neutral-mid hover:text-neutral-off-white hover:border-border-std transition-all">
                   <Github size={14} />
                   <span>GitHub</span>
                 </a>
-                <a href="https://bentossh.com" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-surface-near-black border border-border-dark rounded-std text-xs text-neutral-mid hover:text-neutral-off-white hover:border-border-std transition-all">
+                <a href="https://github.com/pallab-js/BentoSSH/issues" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-4 py-2 bg-surface-near-black border border-border-dark rounded-std text-xs text-neutral-mid hover:text-neutral-off-white hover:border-border-std transition-all">
                   <ExternalLink size={14} />
-                  <span>Website</span>
+                  <span>Report an Issue</span>
                 </a>
               </div>
               <div class="pt-8 text-[10px] text-neutral-dark font-mono">
-                © 2026 BentoSSH Contributors. Released under MIT License.
+                © 2026 BentoSSH Contributors. Released under the GPL-3.0 License.
               </div>
             </div>
           {/if}
@@ -363,23 +316,3 @@
   </div>
 {/if}
 
-<style>
-  .btn-primary-pill {
-    background: #0f0f0f;
-    color: #fafafa;
-    border-radius: 9999px;
-    border: 1px solid #fafafa;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s;
-  }
-  
-  .btn-primary-pill:hover {
-    background: #1a1a1a;
-    border-color: #3ecf8e;
-    color: #3ecf8e;
-  }
-
-  .rounded-std { border-radius: 6px; }
-  .rounded-large { border-radius: 12px; }
-</style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { X, Activity, HardDrive, Server, ExternalLink, RefreshCw, ChevronRight } from 'lucide-svelte';
+  import { X, Activity, Server, ExternalLink, RefreshCw, ChevronRight } from 'lucide-svelte';
   import { uiState } from '$lib/state.svelte';
   import { sessionState } from '$lib/session.svelte';
   import { invoke } from '@tauri-apps/api/core';
@@ -197,10 +197,3 @@
   </div>
 {/if}
 
-<style>
-  .card {
-    background: var(--surface-dark);
-    padding: 1.5rem;
-    border-radius: var(--radius-comfortable);
-  }
-</style>

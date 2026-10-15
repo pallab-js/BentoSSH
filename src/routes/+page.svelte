@@ -1,7 +1,8 @@
 <script lang="ts">
   import Terminal from '$lib/components/Terminal.svelte';
   import { invoke } from '@tauri-apps/api/core';
-  import { X, Plus, Terminal as TerminalIcon, HardDrive, Zap, RefreshCw, Command, Activity } from 'lucide-svelte';
+  import { open } from '@tauri-apps/plugin-dialog';
+  import { X, Plus, Terminal as TerminalIcon, HardDrive, FolderOpen, Activity } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import { onMount } from 'svelte';
   import { uiState } from '$lib/state.svelte';
@@ -9,7 +10,25 @@
 
   import { sessionState } from '$lib/session.svelte';
 
-  let newHost = $state({ name: '', ip: '', port: 22, username: '', password: '', keyPath: '' });
+  let newHost = $state({
+    name: '',
+    ip: '',
+    port: 22,
+    username: '',
+    authType: 'password' as 'password' | 'key',
+    password: '',
+    keyPath: ''
+  });
+  let isSaving = $state(false);
+
+  // Platform-aware modifier label for shortcut hints (⌘ on macOS, Ctrl elsewhere).
+  const isMac =
+    typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent);
+  const modKey = isMac ? '⌘' : 'Ctrl';
+
+  function resetNewHost() {
+    newHost = { name: '', ip: '', port: 22, username: '', authType: 'password', password: '', keyPath: '' };
+  }
 
   async function connectToHost(host: any) {
     await sessionState.connectToHost(host);
@@ -19,23 +38,56 @@
     sessionState.closeSession(sessionId);
   }
 
+  async function browseKeyPath() {
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        title: 'Select SSH Private Key'
+      });
+      if (selected && typeof selected === 'string') {
+        newHost.keyPath = selected;
+      }
+    } catch (e) {
+      console.error('Failed to open dialog', e);
+    }
+  }
+
   async function saveHost() {
+    if (!newHost.name || !newHost.ip || !newHost.username) {
+      toast.error('Name, host address and username are required');
+      return;
+    }
+    const usingKey = newHost.authType === 'key';
+    const persistPassword = settingsState.current.security.savePasswords;
+    isSaving = true;
     try {
       await invoke('save_host', {
         name: newHost.name,
         ip: newHost.ip,
         port: newHost.port,
         username: newHost.username,
-        password: newHost.password || null,
-        keyPath: newHost.keyPath || null
+        password: usingKey || !persistPassword ? null : newHost.password || null,
+        keyPath: usingKey ? newHost.keyPath || null : null
       });
+
+      // Find the host we just saved so we can connect to it. save_host stamps
+      // last_connected=now, so the newest matching record is ours.
+      const hosts = (await invoke('get_hosts')) as any[];
+      const saved = hosts.find((h) => h.name === newHost.name && h.ip === newHost.ip && h.username === newHost.username);
+
       uiState.showAddHost = false;
-      newHost = { name: '', ip: '', port: 22, username: '', password: '', keyPath: '' };
-      // Refresh hosts in layout
+      resetNewHost();
       window.dispatchEvent(new CustomEvent('refresh-hosts'));
-      toast.success('Host saved successfully');
+      toast.success('Host saved');
+
+      if (saved) {
+        await connectToHost(saved);
+      }
     } catch (e) {
       toast.error('Save host failed: ' + e);
+    } finally {
+      isSaving = false;
     }
   }
 
@@ -137,7 +189,7 @@
         <div class="text-center">
           <h1 class="hero-text text-neutral-off-white mb-4">BentoSSH</h1>
           <p class="text-[18px] text-neutral-mid font-sans max-w-md mx-auto leading-relaxed">
-            A premium, high-performance SSH client designed for the modern developer soul.
+            A modern, privacy-first SSH client. Connect, manage, and monitor your servers.
           </p>
         </div>
       </div>
@@ -148,11 +200,11 @@
           <div class="flex flex-col gap-2">
             <button type="button" class="w-full flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std group cursor-pointer hover:border-brand-green/30" onclick={() => uiState.isPaletteOpen = true}>
               <span class="text-sm">Search Saved Hosts</span>
-              <kbd class="text-[10px] text-neutral-dark font-mono group-hover:text-neutral-mid uppercase">⌘{settingsState.current.keyboard.commandPalette}</kbd>
+              <kbd class="text-[10px] text-neutral-dark font-mono group-hover:text-neutral-mid uppercase">{modKey}{settingsState.current.keyboard.commandPalette}</kbd>
             </button>
             <button type="button" class="w-full flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std group cursor-pointer hover:border-brand-green/30" onclick={() => uiState.showAddHost = true}>
               <span class="text-sm">Create New Session</span>
-              <kbd class="text-[10px] text-neutral-dark font-mono group-hover:text-neutral-mid uppercase">⌘{settingsState.current.keyboard.newSession}</kbd>
+              <kbd class="text-[10px] text-neutral-dark font-mono group-hover:text-neutral-mid uppercase">{modKey}{settingsState.current.keyboard.newSession}</kbd>
             </button>
           </div>
         </div>
@@ -162,19 +214,15 @@
           <div class="flex flex-col gap-2">
             <div class="flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std">
               <span class="text-sm">Switch Active Tabs</span>
-              <kbd class="text-[10px] text-neutral-dark font-mono">⌘⇧[ / ]</kbd>
+              <kbd class="text-[10px] text-neutral-dark font-mono">{modKey}⇧[ / ]</kbd>
             </div>
             <div class="flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std">
               <span class="text-sm">Close Current Session</span>
-              <kbd class="text-[10px] text-neutral-dark font-mono uppercase">⌘{settingsState.current.keyboard.closeSession}</kbd>
+              <kbd class="text-[10px] text-neutral-dark font-mono uppercase">{modKey}{settingsState.current.keyboard.closeSession}</kbd>
             </div>
           </div>
         </div>
       </div>
-
-      <button class="btn-primary-pill" onclick={() => uiState.showAddHost = true}>
-        Start your project
-      </button>
     </div>
   {:else}
     {#each sessionState.sessions as session (session.id)}
@@ -234,15 +282,40 @@
             <input id="host-port" type="number" bind:value={newHost.port} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="22" />
           </div>
         </div>
-        <div class="flex flex-col gap-1.5 pt-2 border-t border-border-dark">
-          <label for="host-pass" class="mono-label text-[10px]">Authentication</label>
-          <input id="host-pass" type="password" bind:value={newHost.password} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="Password or Key Passphrase" />
+        <div class="flex flex-col gap-2 pt-2 border-t border-border-dark">
+          <span class="mono-label text-[10px]">Authentication</span>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              class="py-2 border text-xs rounded-std transition-colors {newHost.authType === 'password' ? 'border-brand-green bg-brand-green/5 text-neutral-off-white' : 'border-border-dark bg-surface-near-black text-neutral-mid hover:border-border-std'}"
+              onclick={() => newHost.authType = 'password'}
+            >Password</button>
+            <button
+              type="button"
+              class="py-2 border text-xs rounded-std transition-colors {newHost.authType === 'key' ? 'border-brand-green bg-brand-green/5 text-neutral-off-white' : 'border-border-dark bg-surface-near-black text-neutral-mid hover:border-border-std'}"
+              onclick={() => newHost.authType = 'key'}
+            >Private Key</button>
+          </div>
+
+          {#if newHost.authType === 'password'}
+            <input id="host-pass" type="password" bind:value={newHost.password} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="Password" />
+          {:else}
+            <div class="flex gap-2">
+              <input bind:value={newHost.keyPath} class="flex-1 bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="~/.ssh/id_rsa" />
+              <button type="button" class="px-3 bg-surface-near-black border border-border-dark rounded-std text-xs hover:border-border-std flex items-center gap-1.5" onclick={browseKeyPath}>
+                <FolderOpen size={14} />
+                <span>Browse</span>
+              </button>
+            </div>
+          {/if}
         </div>
       </div>
-      
+
       <div class="px-6 py-4 bg-surface-near-black border-t border-border-dark flex justify-end gap-3">
-        <button class="btn-ghost px-4" onclick={() => uiState.showAddHost = false}>Cancel</button>
-        <button class="btn-primary-pill !px-6 !py-1.5" onclick={saveHost}>Connect Session</button>
+        <button class="btn-ghost px-4" onclick={() => { uiState.showAddHost = false; resetNewHost(); }}>Cancel</button>
+        <button class="btn-primary-pill !px-6 !py-1.5 disabled:opacity-50" disabled={isSaving} onclick={saveHost}>
+          {isSaving ? 'Connecting…' : 'Save & Connect'}
+        </button>
       </div>
     </div>
   </div>

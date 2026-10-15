@@ -6,12 +6,17 @@
   import HealthDashboard from '$lib/components/HealthDashboard.svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { onMount } from 'svelte';
-  import { Server, Settings, Plus, Terminal as TerminalIcon, Search, Activity } from 'lucide-svelte';
+  import { Server, Settings, Plus, Search, Activity } from 'lucide-svelte';
   import { uiState } from '$lib/state.svelte';
   import { settingsState } from '$lib/settings.svelte';
   import { sessionState } from '$lib/session.svelte';
 
   let { children } = $props();
+
+  // Platform-aware modifier label for shortcut hints.
+  const isMac =
+    typeof navigator !== 'undefined' && /mac|iphone|ipad|ipod/i.test(navigator.platform || navigator.userAgent);
+  const modKey = isMac ? '⌘' : 'Ctrl';
 
   interface Host {
     id: number;
@@ -46,8 +51,8 @@
       paletteItems = [
         ...hosts.map(h => ({ id: String(h.id), name: h.name, type: 'host' as const, ip: h.ip, original: h } as PaletteItem)),
         { id: 'new-host', name: 'New SSH Session...', type: 'action' as const } as PaletteItem,
-        { id: 'restart-service', name: 'Restart Service (Active)', type: 'action' as const } as PaletteItem,
-        { id: 'tail-logs', name: 'Tail Syslog (Active)', type: 'action' as const } as PaletteItem
+        { id: 'restart_sshd', name: 'Restart SSH Daemon (Active)', type: 'action' as const } as PaletteItem,
+        { id: 'tail_logs', name: 'Tail System Logs (Active)', type: 'action' as const } as PaletteItem
       ];
     } catch (e) {
       console.error('Failed to load hosts', e);
@@ -136,7 +141,7 @@
         >
           <Search size={14} class="text-neutral-mid group-hover:text-neutral-off-white" />
           <span>Find...</span>
-          <span class="ml-auto text-[10px] text-neutral-dark group-hover:text-neutral-mid uppercase">⌘{settingsState.current.keyboard.commandPalette}</span>
+          <span class="ml-auto text-[10px] text-neutral-dark group-hover:text-neutral-mid uppercase">{modKey}{settingsState.current.keyboard.commandPalette}</span>
         </button>
       </div>
     </div>

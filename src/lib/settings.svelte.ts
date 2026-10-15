@@ -17,12 +17,9 @@ export interface Settings {
     commandPalette: string;
     newSession: string;
     closeSession: string;
-    pasteOnRightClick: boolean;
   };
   notifications: {
     connectionAlerts: boolean;
-    terminalBell: boolean;
-    commandFinished: boolean;
   };
 }
 
@@ -42,13 +39,10 @@ const DEFAULT_SETTINGS: Settings = {
   keyboard: {
     commandPalette: 'k',
     newSession: 't',
-    closeSession: 'w',
-    pasteOnRightClick: true
+    closeSession: 'w'
   },
   notifications: {
-    connectionAlerts: true,
-    terminalBell: true,
-    commandFinished: false
+    connectionAlerts: true
   }
 };
 
