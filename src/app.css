@@ -105,6 +105,19 @@
     @apply border-r border-border-dark flex flex-col h-screen transition-all duration-300;
   }
 
+  .sidebar.collapsed {
+    --sidebar-width: 64px;
+  }
+
+  /* In the collapsed rail, center icon-only items and drop label spacing. */
+  .sidebar.collapsed .sidebar-content {
+    @apply px-0;
+  }
+
+  .sidebar.collapsed .sidebar-item {
+    @apply justify-center px-0 gap-0;
+  }
+
   .sidebar-header {
     height: var(--titlebar-height);
     @apply px-4 flex items-center border-b border-border-dark overflow-hidden;

@@ -148,7 +148,8 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<!-- Tab Bar -->
+<!-- Tab Bar (only shown when sessions exist) -->
+{#if sessionState.sessions.length > 0}
 <div class="tab-bar">
   {#each sessionState.sessions as session (session.id)}
     <div
@@ -177,11 +178,13 @@
   {/each}
   <button
     class="px-3 flex items-center justify-center hover:bg-white/5 text-neutral-mid transition-colors"
+    aria-label="New session"
     onclick={() => uiState.showAddHost = true}
   >
     <Plus size={14} />
   </button>
 </div>
+{/if}
 
 <!-- Terminal Area -->
 <div class="terminal-container">

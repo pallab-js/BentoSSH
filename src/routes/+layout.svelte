@@ -6,8 +6,8 @@
   import HealthDashboard from '$lib/components/HealthDashboard.svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { onMount } from 'svelte';
-  import { Server, Settings, Plus, Search, Activity } from 'lucide-svelte';
-  import { uiState } from '$lib/state.svelte';
+  import { Server, Settings, Plus, Search, Activity, PanelLeftClose, PanelLeftOpen } from 'lucide-svelte';
+  import { uiState, toggleSidebar } from '$lib/state.svelte';
   import { settingsState } from '$lib/settings.svelte';
   import { sessionState } from '$lib/session.svelte';
 
@@ -89,73 +89,101 @@
 
 <div class="flex h-screen overflow-hidden bg-surface-near-black font-sans theme-emerald">
   <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="sidebar-header">
-      <div class="flex items-center gap-2">
-        <div class="w-6 h-6 flex items-center justify-center text-accent">
-          <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21.362 9.354H12V.396L2.638 14.646H12v8.958z"/>
-          </svg>
+  <aside class="sidebar {uiState.sidebarCollapsed ? 'collapsed' : ''}">
+    <div class="sidebar-header {uiState.sidebarCollapsed ? 'justify-center' : 'justify-between'}">
+      {#if !uiState.sidebarCollapsed}
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 flex items-center justify-center text-accent shrink-0">
+            <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current" xmlns="http://www.w3.org/2000/svg">
+              <path d="M21.362 9.354H12V.396L2.638 14.646H12v8.958z"/>
+            </svg>
+          </div>
+          <span class="font-normal text-sm tracking-tight text-neutral-off-white">BentoSSH</span>
         </div>
-        <span class="font-normal text-sm tracking-tight text-neutral-off-white">BentoSSH</span>
-      </div>
+      {/if}
+      <button
+        type="button"
+        class="text-neutral-mid hover:text-neutral-off-white transition-colors p-1 hover:bg-white/5 rounded-std shrink-0"
+        onclick={toggleSidebar}
+        aria-label={uiState.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        title={uiState.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {#if uiState.sidebarCollapsed}
+          <PanelLeftOpen size={16} />
+        {:else}
+          <PanelLeftClose size={16} />
+        {/if}
+      </button>
     </div>
 
     <div class="sidebar-content">
       <div class="sidebar-section">
-        <div class="sidebar-section-title">Saved Hosts</div>
+        {#if !uiState.sidebarCollapsed}
+          <div class="sidebar-section-title">Saved Hosts</div>
+        {/if}
         {#each hosts as host}
           <button 
             type="button"
             class="sidebar-item group w-full text-left" 
             onclick={() => window.dispatchEvent(new CustomEvent('connect-host', { detail: host }))}
+            title={uiState.sidebarCollapsed ? host.name : undefined}
           >
-            <Server size={14} class="text-neutral-mid group-hover:text-accent transition-colors" />
-            <span class="truncate">{host.name}</span>
+            <Server size={14} class="text-neutral-mid group-hover:text-accent transition-colors shrink-0" />
+            {#if !uiState.sidebarCollapsed}<span class="truncate">{host.name}</span>{/if}
           </button>
         {/each}
         <button 
           type="button"
           class="sidebar-item group w-full text-left text-neutral-mid mt-1 hover:text-neutral-off-white" 
           onclick={() => window.dispatchEvent(new CustomEvent('show-add-host'))}
+          title={uiState.sidebarCollapsed ? 'Add New Host' : undefined}
         >
-          <Plus size={14} />
-          <span>Add New Host</span>
+          <Plus size={14} class="shrink-0" />
+          {#if !uiState.sidebarCollapsed}<span>Add New Host</span>{/if}
         </button>
       </div>
 
       <div class="sidebar-section mt-6">
-        <div class="sidebar-section-title">Maintenance</div>
+        {#if !uiState.sidebarCollapsed}
+          <div class="sidebar-section-title">Maintenance</div>
+        {/if}
         <button 
           type="button" 
           class="sidebar-item group w-full text-left"
           onclick={() => uiState.showHealth = true}
+          title={uiState.sidebarCollapsed ? 'Server Health' : undefined}
         >
-          <Activity size={14} class="text-neutral-mid group-hover:text-neutral-off-white" />
-          <span>Server Health</span>
+          <Activity size={14} class="text-neutral-mid group-hover:text-neutral-off-white shrink-0" />
+          {#if !uiState.sidebarCollapsed}<span>Server Health</span>{/if}
         </button>
         <button 
           type="button"
           class="sidebar-item group w-full text-left" 
           onclick={() => uiState.isPaletteOpen = true}
+          title={uiState.sidebarCollapsed ? 'Find…' : undefined}
         >
-          <Search size={14} class="text-neutral-mid group-hover:text-neutral-off-white" />
-          <span>Find...</span>
-          <span class="ml-auto text-[10px] text-neutral-dark group-hover:text-neutral-mid uppercase">{modKey}{settingsState.current.keyboard.commandPalette}</span>
+          <Search size={14} class="text-neutral-mid group-hover:text-neutral-off-white shrink-0" />
+          {#if !uiState.sidebarCollapsed}
+            <span>Find...</span>
+            <span class="ml-auto text-[10px] text-neutral-dark group-hover:text-neutral-mid uppercase">{modKey}{settingsState.current.keyboard.commandPalette}</span>
+          {/if}
         </button>
       </div>
     </div>
 
-    <div class="p-4 border-t border-border-dark flex items-center justify-between">
-      <div class="flex items-center gap-2 text-xs text-neutral-mid">
-        <div class="w-1.5 h-1.5 rounded-full bg-accent"></div>
-        <span>System Ready</span>
-      </div>
+    <div class="p-4 border-t border-border-dark flex items-center {uiState.sidebarCollapsed ? 'justify-center' : 'justify-between'}">
+      {#if !uiState.sidebarCollapsed}
+        <div class="flex items-center gap-2 text-xs text-neutral-mid">
+          <div class="w-1.5 h-1.5 rounded-full bg-accent"></div>
+          <span>System Ready</span>
+        </div>
+      {/if}
       <button 
         type="button" 
         class="text-neutral-mid hover:text-neutral-off-white cursor-pointer transition-colors p-1 hover:bg-white/5 rounded-std"
         onclick={() => uiState.showSettings = true}
         aria-label="Settings"
+        title={uiState.sidebarCollapsed ? 'Settings' : undefined}
       >
         <Settings size={14} />
       </button>
