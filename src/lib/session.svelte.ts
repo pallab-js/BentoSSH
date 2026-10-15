@@ -18,18 +18,36 @@ function createSessionState() {
   let activeSessionId = $state<string | null>(null);
   let healthData = $state<Record<string, HealthData>>({}); // sessionId -> {cpu, ram}
 
-  async function startHealthPolling(sessionId: string) {
+  // Track pending poll timers so they can be cancelled on disconnect.
+  const pollTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+
+  function startHealthPolling(sessionId: string) {
     const poll = async () => {
-      if (!sessions.find(s => s.id === sessionId)) return;
+      // Stop if the session was closed.
+      if (!sessions.find((s) => s.id === sessionId)) {
+        delete pollTimers[sessionId];
+        return;
+      }
       try {
-        const [cpu, ram] = await invoke('get_server_health', { sessionId }) as [string, string];
+        const [cpu, ram] = (await invoke('get_server_health', { sessionId })) as [string, string];
         healthData[sessionId] = { cpu, ram };
       } catch (e) {
-        // Silently fail health polls
+        // Silently ignore transient health poll failures.
       }
-      setTimeout(poll, 5000);
+      // Reschedule only if still active.
+      if (sessions.find((s) => s.id === sessionId)) {
+        pollTimers[sessionId] = setTimeout(poll, 5000);
+      }
     };
     poll();
+  }
+
+  function stopHealthPolling(sessionId: string) {
+    const timer = pollTimers[sessionId];
+    if (timer) {
+      clearTimeout(timer);
+      delete pollTimers[sessionId];
+    }
   }
 
   return {
@@ -63,6 +81,7 @@ function createSessionState() {
     },
 
     closeSession(sessionId: string) {
+      stopHealthPolling(sessionId);
       sessions = sessions.filter(s => s.id !== sessionId);
       if (activeSessionId === sessionId) {
         activeSessionId = sessions[sessions.length - 1]?.id || null;

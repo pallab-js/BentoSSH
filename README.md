@@ -1,113 +1,113 @@
+<div align="center">
+
 # BentoSSH
 
-> **A modern, privacy-first SSH client for developers who care about craft.**
-> Inspired by the workflow philosophy of Termius, rebuilt from the ground up in Rust + Tauri + SvelteKit.
+A modern, privacy-first SSH client built with Rust, Tauri, and SvelteKit.
+
+[![CI](https://github.com/pallab-js/BentoSSH/actions/workflows/ci.yml/badge.svg)](https://github.com/pallab-js/BentoSSH/actions/workflows/ci.yml)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+
+</div>
+
+## Overview
+
+BentoSSH is a lightweight desktop SSH client. It stores host metadata locally in
+SQLite and keeps credentials in your operating system's native keychain. There is
+no cloud sync and no telemetry — everything runs on your machine.
+
+> **Status:** Early development (`0.1.0`). Core connect, terminal, and host
+> management flows work. Expect rough edges.
 
 ## Features
 
-- **Bento Grid Dashboard** — Spatial card-based layout showing active terminals, server health, quick actions, and pinned hosts
-- **Native Performance** — Cold start <500ms on Apple Silicon. No Electron overhead
-- **Privacy-First** — No cloud sync. No telemetry. Credentials stored in OS-native keychain (Keychain/libsecret/Windows Credential Manager)
-- **Integrated Terminal** — Xterm.js + PTY streaming, full theme integration, resize support
-- **Multi-Session Tiling** — Run multiple SSH sessions in tiled bento boxes within a single window
+- **Bento grid dashboard** — card-based layout for hosts, sessions, and quick actions.
+- **Integrated terminal** — Xterm.js front end streaming a real PTY over SSH, with resize support.
+- **Multiple sessions** — open several SSH sessions as tabs in one window.
+- **Native keychain storage** — passwords and keys live in Keychain (macOS),
+  libsecret (Linux), or Credential Manager (Windows), never in plain text.
+- **Local-only** — host metadata in a `0600` SQLite file under `~/.bentossh`; no network calls beyond your SSH connections.
 
-## Tech Stack
+## Tech stack
 
-**Backend:** Rust + Tauri v2 + ssh2 + tokio + keyring-rs + rusqlite  
-**Frontend:** SvelteKit 5 + Tailwind CSS + Xterm.js + lucide-svelte  
-**Build:** Cross-platform via GitHub Actions (macOS, Linux, Windows)
+| Layer    | Technologies                                              |
+| -------- | --------------------------------------------------------- |
+| Backend  | Rust, Tauri v2, `ssh2`, `tokio`, `keyring`, `rusqlite`    |
+| Frontend | SvelteKit 5, Tailwind CSS, Xterm.js, lucide-svelte        |
+| CI       | GitHub Actions (lint, test, cross-platform build)         |
 
-## Quick Start
+## Getting started
 
 ### Prerequisites
 
 - [Rust](https://rustup.rs/) (stable)
-- [Node.js](https://nodejs.org/) (v20+)
-- [Tauri CLI](https://tauri.app/v2/start/prerequisites/)
+- [Node.js](https://nodejs.org/) 20+
+- Platform build dependencies — see the [Tauri prerequisites](https://tauri.app/start/prerequisites/)
 
 ### Development
 
 ```bash
-# Clone repo
 git clone https://github.com/pallab-js/BentoSSH.git
-cd bentossh
-
-# Install dependencies
+cd BentoSSH
 npm install
-
-# Run in dev mode
 npm run tauri:dev
-```
-
-### Testing
-
-```bash
-# Run backend integration tests
-npm test
 ```
 
 ### Build
 
 ```bash
-# Build for production
 npm run tauri:build
-
-# Output: src-tauri/target/release/bundle/
+# Bundles are written to src-tauri/target/release/bundle/
 ```
 
-## Project Structure
+## Testing & quality
+
+```bash
+npm test                       # Rust backend tests (cargo test)
+npm run check                  # Svelte / TypeScript type-check
+cd src-tauri && cargo clippy   # Rust linting
+cd src-tauri && cargo fmt      # Rust formatting
+```
+
+CI runs formatting, Clippy (`-D warnings`), backend tests, a frontend build, and
+`svelte-check` on every push and pull request to `main`.
+
+## Project structure
 
 ```
-bentossh/
-├── src-tauri/          # Rust backend
-│   ├── src/
-│   │   ├── lib.rs     # Tauri commands (ssh_connect, etc.)
-│   │   └── tests.rs    # Backend integration tests
-│   └── Cargo.toml
-├── src/                # SvelteKit frontend
-│   ├── routes/
-│   │   └── +page.svelte  # Main Bento Grid dashboard
+BentoSSH/
+├── src/                       # SvelteKit frontend
+│   ├── routes/                # Pages and layout
 │   └── lib/
-│       └── components/
-│           └── Terminal.svelte  # Xterm.js wrapper
-├── docs/               # Project documentation (Blueprint, Design)
-├── src-tauri/target/release/bundle/  # Built apps
-└── .github/workflows/  # CI/CD
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────┐
-│             SvelteKit Frontend           │
-│  Bento Grid · Xterm.js · Tailwind CSS   │
-└────────────────────┬────────────────────┘
-                     │  Tauri IPC (Commands / Events)
-┌────────────────────▼────────────────────┐
-│              Rust Backend                │
-│  SSH Engine · Keychain · SQLite · PTY   │
-└─────────────────────────────────────────┘
+│       ├── components/        # Terminal, command palette, settings, health
+│       └── *.svelte.ts        # Session / UI / settings state
+├── src-tauri/                 # Rust backend
+│   └── src/
+│       ├── lib.rs             # Tauri commands (ssh_connect, host CRUD, …)
+│       ├── tests.rs           # Backend tests
+│       └── main.rs
+├── docs/                      # Blueprint and design notes
+└── .github/workflows/         # CI and release pipelines
 ```
 
 ## Security
 
-- **Zero-Trust Storage** — Host metadata in SQLite. Passwords/keys in OS keychain only.
-- **Isolation Pattern** — Frontend can only call declared `#[tauri::command]` functions.
-- **Path Traversal Protection** — SSH key paths are strictly validated and restricted to `~/.ssh` or the app's internal directory.
-- **SSRF Mitigation** — Outbound SSH connections are restricted for sensitive internal ports to prevent network scanning.
-- **Restricted Permissions** — Application data directory (`~/.bentossh`) and database file are created with strict `0700` and `0600` permissions on Unix systems.
-- **No Telemetry** — App runs fully local. No data leaves your machine.
+- **Credential isolation** — secrets are stored only in the OS keychain; the
+  SQLite database holds non-secret host metadata.
+- **Command isolation** — the frontend can only call declared
+  `#[tauri::command]` functions over Tauri IPC.
+- **Key path validation** — SSH key paths are canonicalized and restricted to
+  `~/.ssh` or `~/.bentossh`.
+- **Port restrictions** — outbound connections to a set of common non-SSH ports
+  are blocked to reduce accidental network scanning.
+- **Strict file permissions** — on Unix, `~/.bentossh` is created `0700` and the
+  database file `0600`.
+
+Found a vulnerability? Please open a private security advisory rather than a public issue.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-GPL-3.0 — Open Source. Contributions welcome.
-
----
-
-**Status:** Production Ready (v1.0.0)  
-**Current Version:** 1.0.0  
-**Platforms:** macOS (Apple Silicon & Intel), Linux, Windows
+[GPL-3.0](LICENSE)

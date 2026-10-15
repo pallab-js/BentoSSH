@@ -4,7 +4,7 @@ use super::*;
 fn test_session_management() {
     let sessions = SESSIONS.lock().unwrap();
     let _initial_count = sessions.len();
-    
+
     // We can't easily create a real ssh2::Session without a server,
     // but we can verify the Mutex and Vector logic if we were to mock it.
     // For now, just verify the mutex works.
@@ -24,9 +24,12 @@ fn test_db_init_in_memory() {
             last_connected TEXT
         )",
         [],
-    ).unwrap();
-    
-    let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='hosts'").unwrap();
+    )
+    .unwrap();
+
+    let mut stmt = conn
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='hosts'")
+        .unwrap();
     let exists = stmt.exists([]).unwrap();
     assert!(exists);
 }
@@ -45,7 +48,8 @@ fn test_host_crud_operations() {
             last_connected TEXT
         )",
         [],
-    ).unwrap();
+    )
+    .unwrap();
 
     // Insert
     conn.execute(
@@ -54,14 +58,16 @@ fn test_host_crud_operations() {
     ).unwrap();
 
     // Query
-    let mut stmt = conn.prepare("SELECT name, ip, port, username FROM hosts WHERE name = ?").unwrap();
+    let mut stmt = conn
+        .prepare("SELECT name, ip, port, username FROM hosts WHERE name = ?")
+        .unwrap();
     let mut rows = stmt.query(params!["Test Host"]).unwrap();
     if let Some(row) = rows.next().unwrap() {
         let name: String = row.get(0).unwrap();
         let ip: String = row.get(1).unwrap();
         let port: i32 = row.get(2).unwrap();
         let username: String = row.get(3).unwrap();
-        
+
         assert_eq!(name, "Test Host");
         assert_eq!(ip, "127.0.0.1");
         assert_eq!(port, 22);
@@ -71,13 +77,26 @@ fn test_host_crud_operations() {
     }
 
     // Update
-    conn.execute("UPDATE hosts SET name = ? WHERE ip = ?", params!["Updated Host", "127.0.0.1"]).unwrap();
-    let new_name: String = conn.query_row("SELECT name FROM hosts WHERE ip = ?", params!["127.0.0.1"], |r| r.get(0)).unwrap();
+    conn.execute(
+        "UPDATE hosts SET name = ? WHERE ip = ?",
+        params!["Updated Host", "127.0.0.1"],
+    )
+    .unwrap();
+    let new_name: String = conn
+        .query_row(
+            "SELECT name FROM hosts WHERE ip = ?",
+            params!["127.0.0.1"],
+            |r| r.get(0),
+        )
+        .unwrap();
     assert_eq!(new_name, "Updated Host");
 
     // Delete
-    conn.execute("DELETE FROM hosts WHERE ip = ?", params!["127.0.0.1"]).unwrap();
-    let count: i32 = conn.query_row("SELECT COUNT(*) FROM hosts", [], |r| r.get(0)).unwrap();
+    conn.execute("DELETE FROM hosts WHERE ip = ?", params!["127.0.0.1"])
+        .unwrap();
+    let count: i32 = conn
+        .query_row("SELECT COUNT(*) FROM hosts", [], |r| r.get(0))
+        .unwrap();
     assert_eq!(count, 0);
 }
 #[test]
@@ -103,13 +122,13 @@ fn test_path_validation() {
         if !ssh_dir.exists() {
             std::fs::create_dir_all(&ssh_dir).ok();
         }
-        
+
         let test_key = ssh_dir.join("test_id_rsa");
         std::fs::write(&test_key, "dummy").ok();
-        
+
         let result = validate_key_path(&test_key);
         assert!(result.is_ok());
-        
+
         // Clean up
         std::fs::remove_file(&test_key).ok();
     }

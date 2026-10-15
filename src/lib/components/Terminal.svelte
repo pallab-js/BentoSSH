@@ -151,6 +151,20 @@
       isConnected = true;
     }
   });
+
+  // When a previously-hidden tab becomes visible, refit and sync the PTY size.
+  $effect(() => {
+    if (visible && term && fitAddon) {
+      setTimeout(() => {
+        if (terminalContainer.offsetWidth === 0 || terminalContainer.offsetHeight === 0) return;
+        fitAddon.fit();
+        const dims = fitAddon.proposeDimensions();
+        if (dims && sessionId) {
+          invoke('ssh_resize', { sessionId, cols: dims.cols, rows: dims.rows }).catch(console.error);
+        }
+      }, 20);
+    }
+  });
   let unlisten: UnlistenFn | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let cleanup: (() => void) | null = null;
@@ -191,12 +205,14 @@
       // Fit terminal initially and on resize
       setTimeout(() => fitAddon.fit(), 100);
       resizeObserver = new ResizeObserver(() => {
-        if (visible && term) {
-          fitAddon.fit();
-          const dims = fitAddon.proposeDimensions();
-          if (dims && sessionId) {
-            invoke('ssh_resize', { sessionId, cols: dims.cols, rows: dims.rows }).catch(console.error);
-          }
+        // Skip hidden terminals: their container has zero size, so fitting
+        // would push bogus cols/rows to the backend and corrupt the PTY.
+        if (!visible || !term) return;
+        if (terminalContainer.offsetWidth === 0 || terminalContainer.offsetHeight === 0) return;
+        fitAddon.fit();
+        const dims = fitAddon.proposeDimensions();
+        if (dims && sessionId) {
+          invoke('ssh_resize', { sessionId, cols: dims.cols, rows: dims.rows }).catch(console.error);
         }
       });
       resizeObserver.observe(terminalContainer);
