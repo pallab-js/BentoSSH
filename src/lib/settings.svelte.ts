@@ -8,6 +8,7 @@ export interface Settings {
     cursorBlink: boolean;
     scrollback: number;
     theme: string;
+    bell: boolean;
   };
   security: {
     defaultKeyPath: string;
@@ -17,20 +18,22 @@ export interface Settings {
     commandPalette: string;
     newSession: string;
     closeSession: string;
+    pasteOnRightClick: boolean;
   };
   notifications: {
     connectionAlerts: boolean;
   };
 }
 
-const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: Settings = {
   terminal: {
     fontFamily: 'JetBrains Mono',
     fontSize: 14,
     cursorStyle: 'block',
     cursorBlink: true,
     scrollback: 1000,
-    theme: 'dracula'
+    theme: 'dracula',
+    bell: true
   },
   security: {
     defaultKeyPath: '~/.ssh/id_rsa',
@@ -39,21 +42,43 @@ const DEFAULT_SETTINGS: Settings = {
   keyboard: {
     commandPalette: 'k',
     newSession: 't',
-    closeSession: 'w'
+    closeSession: 'w',
+    pasteOnRightClick: true
   },
   notifications: {
     connectionAlerts: true
   }
 };
 
+/**
+ * Merge persisted settings over the defaults, section by section, so newly
+ * added keys always fall back to their default even when an older payload is
+ * loaded from localStorage. Exported for unit testing.
+ */
+export function mergeSettings(defaults: Settings, saved: unknown): Settings {
+  if (!saved || typeof saved !== 'object') return structuredCloneSafe(defaults);
+  const merged = structuredCloneSafe(defaults);
+  for (const section of Object.keys(defaults) as (keyof Settings)[]) {
+    const savedSection = (saved as Record<string, unknown>)[section];
+    if (savedSection && typeof savedSection === 'object') {
+      Object.assign(merged[section] as object, savedSection);
+    }
+  }
+  return merged;
+}
+
+function structuredCloneSafe<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
 function createSettings() {
-  let initialSettings = DEFAULT_SETTINGS;
-  
+  let initialSettings = structuredCloneSafe(DEFAULT_SETTINGS);
+
   if (browser) {
     const saved = localStorage.getItem('bentossh_settings');
     if (saved) {
       try {
-        initialSettings = { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
+        initialSettings = mergeSettings(DEFAULT_SETTINGS, JSON.parse(saved));
       } catch (e) {
         console.error('Failed to parse settings', e);
       }
@@ -63,7 +88,9 @@ function createSettings() {
   const settings = $state<Settings>(initialSettings);
 
   return {
-    get current() { return settings; },
+    get current() {
+      return settings;
+    },
     update(newSettings: Partial<Settings>) {
       Object.assign(settings, newSettings);
       if (browser) {
@@ -71,7 +98,7 @@ function createSettings() {
       }
     },
     reset() {
-      Object.assign(settings, DEFAULT_SETTINGS);
+      Object.assign(settings, structuredCloneSafe(DEFAULT_SETTINGS));
       if (browser) {
         localStorage.removeItem('bentossh_settings');
       }

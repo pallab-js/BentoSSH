@@ -184,6 +184,23 @@
                   </button>
                 </div>
               </section>
+
+              <section class="pt-6 border-t border-border-dark">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="mono-label text-[10px] text-neutral-mid">Terminal Bell</h4>
+                    <p class="text-xs text-neutral-dark mt-1">Play a short beep when the terminal emits a bell character.</p>
+                  </div>
+                  <button
+                    class="w-10 h-5 rounded-full transition-colors relative {settingsState.current.terminal.bell ? 'bg-accent' : 'bg-neutral-dark'}"
+                    onclick={() => settingsState.current.terminal.bell = !settingsState.current.terminal.bell}
+                    aria-label="Toggle Terminal Bell"
+                    aria-pressed={settingsState.current.terminal.bell}
+                  >
+                    <div class="absolute top-1 w-3 h-3 bg-white rounded-full transition-all {settingsState.current.terminal.bell ? 'left-6' : 'left-1'}"></div>
+                  </button>
+                </div>
+              </section>
             </div>
           {:else if activeTab === 'security'}
             <div class="space-y-8">
@@ -260,6 +277,23 @@
                       />
                     </div>
                   </div>
+                </div>
+              </section>
+
+              <section class="pt-6 border-t border-border-dark">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="mono-label text-[10px] text-neutral-mid">Paste on Right Click</h4>
+                    <p class="text-xs text-neutral-dark mt-1">Paste clipboard contents into the terminal on right click.</p>
+                  </div>
+                  <button
+                    class="w-10 h-5 rounded-full transition-colors relative {settingsState.current.keyboard.pasteOnRightClick ? 'bg-accent' : 'bg-neutral-dark'}"
+                    onclick={() => settingsState.current.keyboard.pasteOnRightClick = !settingsState.current.keyboard.pasteOnRightClick}
+                    aria-label="Toggle Paste on Right Click"
+                    aria-pressed={settingsState.current.keyboard.pasteOnRightClick}
+                  >
+                    <div class="absolute top-1 w-3 h-3 bg-white rounded-full transition-all {settingsState.current.keyboard.pasteOnRightClick ? 'left-6' : 'left-1'}"></div>
+                  </button>
                 </div>
               </section>
             </div>

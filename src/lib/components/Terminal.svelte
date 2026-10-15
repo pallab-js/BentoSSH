@@ -166,6 +166,47 @@
   let unlisten: UnlistenFn | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let cleanup: (() => void) | null = null;
+  let audioCtx: AudioContext | null = null;
+
+  /** Play a short beep for the terminal bell using the Web Audio API. */
+  function playBell() {
+    try {
+      audioCtx ??= new (window.AudioContext || (window as any).webkitAudioContext)();
+      const ctx = audioCtx;
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = 'square';
+      oscillator.frequency.value = 880;
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.15);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start();
+      oscillator.stop(ctx.currentTime + 0.15);
+    } catch (e) {
+      // Audio may be unavailable (e.g. no user gesture yet); ignore.
+    }
+  }
+
+  /** Read the clipboard and send it to the session (right-click paste). */
+  async function pasteFromClipboard() {
+    if (!sessionId) return;
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        await invoke('ssh_send_input', { sessionId, data: text });
+      }
+    } catch (e) {
+      console.error('Paste failed', e);
+    }
+  }
+
+  function handleContextMenu(e: MouseEvent) {
+    if (settingsState.current.keyboard.pasteOnRightClick) {
+      e.preventDefault();
+      pasteFromClipboard();
+    }
+  }
 
   onMount(() => {
     const init = async () => {
@@ -224,10 +265,22 @@
         }
       });
 
+      // Terminal bell: beep when enabled in settings.
+      term.onBell(() => {
+        if (settingsState.current.terminal.bell) {
+          playBell();
+        }
+      });
+
+      // Right-click paste.
+      terminalContainer.addEventListener('contextmenu', handleContextMenu);
+
       // Set cleanup function
       cleanup = () => {
         if (resizeObserver) resizeObserver.disconnect();
         if (unlisten) unlisten();
+        terminalContainer.removeEventListener('contextmenu', handleContextMenu);
+        if (audioCtx) audioCtx.close().catch(() => {});
         if (term) term.dispose();
       };
     };
