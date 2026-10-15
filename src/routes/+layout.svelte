@@ -92,7 +92,7 @@
   <aside class="sidebar">
     <div class="sidebar-header">
       <div class="flex items-center gap-2">
-        <div class="w-6 h-6 flex items-center justify-center text-brand-green">
+        <div class="w-6 h-6 flex items-center justify-center text-accent">
           <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current" xmlns="http://www.w3.org/2000/svg">
             <path d="M21.362 9.354H12V.396L2.638 14.646H12v8.958z"/>
           </svg>
@@ -110,7 +110,7 @@
             class="sidebar-item group w-full text-left" 
             onclick={() => window.dispatchEvent(new CustomEvent('connect-host', { detail: host }))}
           >
-            <Server size={14} class="text-neutral-mid group-hover:text-brand-green transition-colors" />
+            <Server size={14} class="text-neutral-mid group-hover:text-accent transition-colors" />
             <span class="truncate">{host.name}</span>
           </button>
         {/each}
@@ -148,7 +148,7 @@
 
     <div class="p-4 border-t border-border-dark flex items-center justify-between">
       <div class="flex items-center gap-2 text-xs text-neutral-mid">
-        <div class="w-1.5 h-1.5 rounded-full bg-brand-green"></div>
+        <div class="w-1.5 h-1.5 rounded-full bg-accent"></div>
         <span>System Ready</span>
       </div>
       <button 

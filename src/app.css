@@ -6,9 +6,9 @@
 
 :root {
   /* Design System Colors */
-  --color-brand-green: #3ecf8e;
-  --color-brand-link: #00c573;
-  --color-brand-border-accent: rgba(62, 207, 142, 0.3);
+  --color-accent: #3ecf8e;
+  --color-accent-link: #00c573;
+  --color-accent-border: rgba(62, 207, 142, 0.3);
   
   --color-surface-near-black: #0f0f0f;
   --color-surface-dark: #171717;
@@ -35,9 +35,9 @@
 
 /* Themes */
 .theme-emerald {
-  --color-brand-green: #3ecf8e;
-  --color-brand-link: #00c573;
-  --color-brand-border-accent: rgba(62, 207, 142, 0.3);
+  --color-accent: #3ecf8e;
+  --color-accent-link: #00c573;
+  --color-accent-border: rgba(62, 207, 142, 0.3);
   --color-surface-dark: #060908;
   --color-surface-near-black: #030504;
 }
@@ -128,7 +128,22 @@
 
   /* Tab Bar */
   .tab-bar {
-    @apply h-[38px] bg-surface-near-black border-b border-border-dark flex overflow-x-auto scrollbar-none;
+    @apply h-[38px] bg-surface-near-black border-b border-border-dark flex overflow-x-auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-std) transparent;
+  }
+
+  .tab-bar::-webkit-scrollbar {
+    height: 3px;
+  }
+
+  .tab-bar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .tab-bar::-webkit-scrollbar-thumb {
+    background: var(--color-border-std);
+    border-radius: 10px;
   }
 
   .tab {
@@ -137,6 +152,10 @@
 
   .tab.active {
     @apply bg-surface-dark text-neutral-off-white;
+  }
+
+  .tab.tab-error {
+    @apply text-[#ea4e5b];
   }
 
   /* Terminal */
@@ -185,14 +204,5 @@
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #363636;
-}
-
-/* Utilities */
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
 }
 

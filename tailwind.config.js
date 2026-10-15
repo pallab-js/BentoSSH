@@ -4,10 +4,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        brand: {
-          green: 'var(--color-brand-green)',
-          link: 'var(--color-brand-link)',
-          'border-accent': 'var(--color-brand-border-accent)'
+        accent: {
+          DEFAULT: 'var(--color-accent)',
+          link: 'var(--color-accent-link)',
+          border: 'var(--color-accent-border)'
         },
         surface: {
           'near-black': '#0f0f0f',

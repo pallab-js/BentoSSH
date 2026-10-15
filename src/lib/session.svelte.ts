@@ -6,7 +6,7 @@ export interface Session {
   id: string;
   name: string;
   host: any;
-  status: string;
+  status: 'connecting' | 'connected' | 'error';
 }
 
 export interface HealthData {
@@ -59,18 +59,23 @@ function createSessionState() {
     get healthData() { return healthData; },
 
     async connectToHost(host: any) {
-      try {
-        const sessionId = await invoke('connect_saved_host', { id: host.id }) as string;
+      // Create a placeholder session immediately so the tab shows a
+      // "connecting" state while the backend establishes the SSH connection.
+      const tempId = `pending-${crypto.randomUUID()}`;
+      const placeholder: Session = { id: tempId, name: host.name, host, status: 'connecting' };
+      sessions = [...sessions, placeholder];
+      activeSessionId = tempId;
 
-        const newSession = {
-          id: sessionId,
-          name: host.name,
-          host: host,
-          status: 'connected'
-        };
-        
-        sessions = [...sessions, newSession];
-        activeSessionId = sessionId;
+      try {
+        const sessionId = (await invoke('connect_saved_host', { id: host.id })) as string;
+
+        // Swap the placeholder for the real session id and mark it connected.
+        sessions = sessions.map((s) =>
+          s.id === tempId ? { ...s, id: sessionId, status: 'connected' as const } : s
+        );
+        if (activeSessionId === tempId) {
+          activeSessionId = sessionId;
+        }
 
         startHealthPolling(sessionId);
         if (settingsState.current.notifications.connectionAlerts) {
@@ -78,7 +83,16 @@ function createSessionState() {
         }
         return sessionId;
       } catch (e) {
+        // Mark the placeholder as errored so the tab shows a failure state;
+        // leave it visible briefly, then remove it.
+        sessions = sessions.map((s) => (s.id === tempId ? { ...s, status: 'error' as const } : s));
         toast.error('Connection failed: ' + e);
+        setTimeout(() => {
+          sessions = sessions.filter((s) => s.id !== tempId);
+          if (activeSessionId === tempId) {
+            activeSessionId = sessions[sessions.length - 1]?.id || null;
+          }
+        }, 2500);
         throw e;
       }
     },

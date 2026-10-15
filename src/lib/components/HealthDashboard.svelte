@@ -2,6 +2,7 @@
   import { X, Activity, Server, ExternalLink, RefreshCw, ChevronRight } from 'lucide-svelte';
   import { uiState } from '$lib/state.svelte';
   import { sessionState } from '$lib/session.svelte';
+  import { modal } from '$lib/actions/modal';
   import { invoke } from '@tauri-apps/api/core';
   import { onMount } from 'svelte';
   import { fade, scale } from 'svelte/transition';
@@ -49,13 +50,18 @@
   >
     <div 
       class="bg-surface-dark border border-border-std rounded-large w-[900px] max-h-[80vh] shadow-2xl flex flex-col overflow-hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Server Health Dashboard"
+      tabindex="-1"
+      use:modal={{ onClose: () => (uiState.showHealth = false) }}
       onclick={(e) => e.stopPropagation()}
       transition:scale={{ duration: 200, start: 0.95 }}
     >
       <!-- Header -->
       <div class="px-8 py-6 border-b border-border-dark flex justify-between items-center bg-surface-dark/50">
         <div class="flex items-center gap-4">
-          <div class="w-10 h-10 rounded-comfortable bg-brand-green/10 flex items-center justify-center text-brand-green">
+          <div class="w-10 h-10 rounded-comfortable bg-accent/10 flex items-center justify-center text-accent">
             <Activity size={24} />
           </div>
           <div>
@@ -75,7 +81,7 @@
       <div class="flex-1 overflow-y-auto p-8 bg-surface-near-black/30">
         {#if isLoading}
           <div class="h-64 flex flex-col items-center justify-center gap-4">
-            <RefreshCw size={32} class="text-brand-green animate-spin" />
+            <RefreshCw size={32} class="text-accent animate-spin" />
             <span class="text-neutral-mid font-mono text-xs uppercase tracking-widest">Gathering metrics...</span>
           </div>
         {:else if hosts.length === 0}
@@ -93,23 +99,23 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             {#each hosts as host}
               {@const session = getSessionForHost(host.id)}
-              <div class="card group border-border-dark hover:border-brand-green/30 transition-all duration-300 relative overflow-hidden">
+              <div class="card group border-border-dark hover:border-accent/30 transition-all duration-300 relative overflow-hidden">
                 <!-- Status indicator glow -->
-                <div class="absolute -top-12 -right-12 w-24 h-24 blur-3xl opacity-10 transition-opacity group-hover:opacity-20 {session ? 'bg-brand-green' : 'bg-neutral-mid'}"></div>
+                <div class="absolute -top-12 -right-12 w-24 h-24 blur-3xl opacity-10 transition-opacity group-hover:opacity-20 {session ? 'bg-accent' : 'bg-neutral-mid'}"></div>
                 
                 <div class="flex justify-between items-start mb-6">
                   <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-std bg-surface-dark flex items-center justify-center border border-border-dark group-hover:border-brand-green/20">
-                      <Server size={14} class={session ? 'text-brand-green' : 'text-neutral-mid'} />
+                    <div class="w-8 h-8 rounded-std bg-surface-dark flex items-center justify-center border border-border-dark group-hover:border-accent/20">
+                      <Server size={14} class={session ? 'text-accent' : 'text-neutral-mid'} />
                     </div>
                     <div>
-                      <h4 class="text-sm font-medium text-neutral-off-white group-hover:text-brand-green transition-colors">{host.name}</h4>
+                      <h4 class="text-sm font-medium text-neutral-off-white group-hover:text-accent transition-colors">{host.name}</h4>
                       <p class="text-[10px] font-mono text-neutral-dark">{host.username}@{host.ip}</p>
                     </div>
                   </div>
                   <div class="flex flex-col items-end gap-1">
-                    <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] uppercase font-mono tracking-wider {session ? 'bg-brand-green/10 text-brand-green border border-brand-green/20' : 'bg-neutral-dark/10 text-neutral-mid border border-border-dark'}">
-                      <div class="w-1 h-1 rounded-full {session ? 'bg-brand-green animate-pulse' : 'bg-neutral-mid'}"></div>
+                    <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] uppercase font-mono tracking-wider {session ? 'bg-accent/10 text-accent border border-accent/20' : 'bg-neutral-dark/10 text-neutral-mid border border-border-dark'}">
+                      <div class="w-1 h-1 rounded-full {session ? 'bg-accent animate-pulse' : 'bg-neutral-mid'}"></div>
                       {session ? 'Connected' : 'Offline'}
                     </div>
                   </div>
@@ -125,7 +131,7 @@
                       </div>
                       <div class="h-1 w-full bg-surface-dark rounded-full overflow-hidden border border-border-dark/50">
                         <div 
-                          class="h-full bg-brand-green transition-all duration-1000 ease-out" 
+                          class="h-full bg-accent transition-all duration-1000 ease-out" 
                           style="width: {sessionState.healthData[session.id].cpu}%"
                         ></div>
                       </div>
@@ -138,7 +144,7 @@
                       </div>
                       <div class="h-1 w-full bg-surface-dark rounded-full overflow-hidden border border-border-dark/50">
                         <div 
-                          class="h-full bg-brand-link transition-all duration-1000 ease-out" 
+                          class="h-full bg-accent-link transition-all duration-1000 ease-out" 
                           style="width: {sessionState.healthData[session.id].ram}%"
                         ></div>
                       </div>
@@ -154,7 +160,7 @@
                   <span class="text-[9px] font-mono text-neutral-dark uppercase">Last seen: {host.last_connected ? new Date(host.last_connected).toLocaleDateString() : 'Never'}</span>
                   {#if !session}
                     <button 
-                      class="flex items-center gap-1.5 text-[10px] font-medium text-neutral-mid hover:text-brand-green transition-colors uppercase tracking-widest"
+                      class="flex items-center gap-1.5 text-[10px] font-medium text-neutral-mid hover:text-accent transition-colors uppercase tracking-widest"
                       onclick={() => sessionState.connectToHost(host)}
                     >
                       Connect <ChevronRight size={12} />
@@ -178,12 +184,12 @@
       <div class="px-8 py-4 bg-surface-near-black border-t border-border-dark flex justify-between items-center">
         <div class="flex items-center gap-6 text-[10px] font-mono text-neutral-dark uppercase tracking-widest">
            <div class="flex items-center gap-2">
-             <div class="w-2 h-2 rounded-full bg-brand-green"></div>
-             <span>{sessionState.sessions.length} Active Sessions</span>
+             <div class="w-2 h-2 rounded-full bg-accent"></div>
+             <span>{sessionState.sessions.length} Active {sessionState.sessions.length === 1 ? 'Session' : 'Sessions'}</span>
            </div>
            <div class="flex items-center gap-2">
              <div class="w-2 h-2 rounded-full bg-neutral-dark"></div>
-             <span>{hosts.length - sessionState.sessions.length} Saved</span>
+             <span>{hosts.length} Saved {hosts.length === 1 ? 'Host' : 'Hosts'}</span>
            </div>
         </div>
         <button 

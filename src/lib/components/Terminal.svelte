@@ -124,17 +124,15 @@
       // Get base theme from presets
       const baseTheme = THEMES[settingsState.current.terminal.theme] || THEMES.standard;
       
-      // Override cursor and selection with global brand color if in "standard" theme
-      // or if you want it to always follow global theme. 
-      // For now, let's let presets decide their own colors, but if "standard" is picked, 
-      // it follows the global theme.
+      // Override cursor and selection with the global accent color when the
+      // "standard" theme is selected so the terminal follows the app accent.
       if (settingsState.current.terminal.theme === 'standard') {
-        const brandColor = '#3ecf8e';
+        const accentColor = '#3ecf8e';
         const selectionColor = 'rgba(62, 207, 142, 0.3)';
-        
-        baseTheme.cursor = brandColor;
+
+        baseTheme.cursor = accentColor;
         baseTheme.selectionBackground = selectionColor;
-        baseTheme.green = brandColor; // Also make green match brand in standard
+        baseTheme.green = accentColor;
       }
       
       term.options.theme = baseTheme;

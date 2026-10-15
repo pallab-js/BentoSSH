@@ -3,6 +3,7 @@
   import { open } from '@tauri-apps/plugin-dialog';
   import { uiState } from '$lib/state.svelte';
   import { settingsState } from '$lib/settings.svelte';
+  import { modal } from '$lib/actions/modal';
   import { fade, scale } from 'svelte/transition';
 
   let activeTab = $state('terminal');
@@ -62,6 +63,11 @@
     <div 
       class="border border-border-std rounded-large w-[850px] h-[600px] shadow-2xl overflow-hidden flex" 
       style="background-color: var(--color-surface-glass); backdrop-filter: blur(var(--glass-blur));"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Settings"
+      tabindex="-1"
+      use:modal={{ onClose: close }}
       onclick={(e) => e.stopPropagation()}
       transition:scale={{ duration: 200, start: 0.95 }}
     >
@@ -71,7 +77,7 @@
         <div class="space-y-1">
           {#each tabs as tab}
             <button
-              class="w-full flex items-center gap-3 px-3 py-2 rounded-std text-sm transition-colors {activeTab === tab.id ? 'bg-brand-green/10 text-brand-green' : 'text-neutral-mid hover:text-neutral-off-white hover:bg-white/5'}"
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-std text-sm transition-colors {activeTab === tab.id ? 'bg-accent/10 text-accent' : 'text-neutral-mid hover:text-neutral-off-white hover:bg-white/5'}"
               onclick={() => activeTab = tab.id}
             >
               <tab.icon size={16} />
@@ -81,7 +87,7 @@
         </div>
         
         <button 
-          class="mt-auto flex items-center gap-2 px-3 py-4 text-xs text-neutral-dark hover:text-crimson-400 transition-colors border-t border-border-dark/50"
+          class="mt-auto flex items-center gap-2 px-3 py-4 text-xs text-neutral-dark hover:text-[#ea4e5b] transition-colors border-t border-border-dark/50"
           onclick={handleReset}
         >
           <RotateCcw size={12} />
@@ -108,7 +114,7 @@
                 <h4 class="mono-label text-[10px] mb-4 text-neutral-mid">Font Family</h4>
                 <select 
                   bind:value={settingsState.current.terminal.fontFamily}
-                  class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors"
+                  class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-accent/50 transition-colors"
                 >
                   <option value="JetBrains Mono">JetBrains Mono</option>
                   <option value="Fira Code">Fira Code</option>
@@ -123,7 +129,7 @@
                   <input 
                     type="number" 
                     bind:value={settingsState.current.terminal.scrollback}
-                    class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors"
+                    class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-accent/50 transition-colors"
                     min="100"
                     max="10000"
                   />
@@ -132,7 +138,7 @@
                   <h4 class="mono-label text-[10px] mb-4 text-neutral-mid">Terminal Color Scheme</h4>
                   <select 
                     bind:value={settingsState.current.terminal.theme}
-                    class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors"
+                    class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-accent/50 transition-colors"
                   >
                     <option value="dracula">Dracula</option>
                     <option value="nord">Nord</option>
@@ -145,14 +151,14 @@
               <section>
                 <div class="flex justify-between items-center mb-4">
                   <h4 class="mono-label text-[10px] text-neutral-mid">Font Size</h4>
-                  <span class="text-xs font-mono text-brand-green">{settingsState.current.terminal.fontSize}px</span>
+                  <span class="text-xs font-mono text-accent">{settingsState.current.terminal.fontSize}px</span>
                 </div>
                 <input 
                   type="range" 
                   min="10" 
                   max="24" 
                   bind:value={settingsState.current.terminal.fontSize} 
-                  class="w-full accent-brand-green" 
+                  class="w-full accent-accent" 
                 />
               </section>
 
@@ -162,7 +168,7 @@
                   <div class="grid grid-cols-3 gap-2">
                     {#each ['block', 'underline', 'bar'] as style}
                       <button 
-                        class="py-2 border text-xs rounded-std capitalize transition-colors {settingsState.current.terminal.cursorStyle === style ? 'border-brand-green bg-brand-green/5 text-neutral-off-white' : 'border-border-dark bg-surface-near-black text-neutral-mid hover:border-border-std'}"
+                        class="py-2 border text-xs rounded-std capitalize transition-colors {settingsState.current.terminal.cursorStyle === style ? 'border-accent bg-accent/5 text-neutral-off-white' : 'border-border-dark bg-surface-near-black text-neutral-mid hover:border-border-std'}"
                         onclick={() => settingsState.current.terminal.cursorStyle = style as any}
                       >{style}</button>
                     {/each}
@@ -171,7 +177,7 @@
                 <div>
                   <h4 class="mono-label text-[10px] mb-4 text-neutral-mid">Cursor Blink</h4>
                   <button 
-                    class="w-full py-2 border text-xs rounded-std transition-colors {settingsState.current.terminal.cursorBlink ? 'border-brand-green bg-brand-green/5 text-neutral-off-white' : 'border-border-dark bg-surface-near-black text-neutral-mid'}"
+                    class="w-full py-2 border text-xs rounded-std transition-colors {settingsState.current.terminal.cursorBlink ? 'border-accent bg-accent/5 text-neutral-off-white' : 'border-border-dark bg-surface-near-black text-neutral-mid'}"
                     onclick={() => settingsState.current.terminal.cursorBlink = !settingsState.current.terminal.cursorBlink}
                   >
                     {settingsState.current.terminal.cursorBlink ? 'Enabled' : 'Disabled'}
@@ -186,7 +192,7 @@
                 <div class="flex gap-2">
                   <input 
                     bind:value={settingsState.current.security.defaultKeyPath}
-                    class="flex-1 bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" 
+                    class="flex-1 bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-accent/50 transition-colors" 
                     placeholder="~/.ssh/id_rsa"
                   />
                   <button 
@@ -206,7 +212,7 @@
                     <p class="text-xs text-neutral-dark mt-1">Securely store passwords in your system keychain.</p>
                   </div>
                   <button 
-                    class="w-10 h-5 rounded-full transition-colors relative {settingsState.current.security.savePasswords ? 'bg-brand-green' : 'bg-neutral-dark'}"
+                    class="w-10 h-5 rounded-full transition-colors relative {settingsState.current.security.savePasswords ? 'bg-accent' : 'bg-neutral-dark'}"
                     onclick={() => settingsState.current.security.savePasswords = !settingsState.current.security.savePasswords}
                     aria-label="Toggle Save Passwords"
                     aria-pressed={settingsState.current.security.savePasswords}
@@ -227,7 +233,7 @@
                       <kbd class="px-2 py-1 bg-border-dark rounded text-[10px] font-mono">⌘</kbd>
                       <input 
                         bind:value={settingsState.current.keyboard.commandPalette}
-                        class="w-8 bg-transparent border-b border-brand-green text-center text-sm uppercase outline-none" 
+                        class="w-8 bg-transparent border-b border-accent text-center text-sm uppercase outline-none" 
                         maxlength="1"
                       />
                     </div>
@@ -238,7 +244,7 @@
                       <kbd class="px-2 py-1 bg-border-dark rounded text-[10px] font-mono">⌘</kbd>
                       <input 
                         bind:value={settingsState.current.keyboard.newSession}
-                        class="w-8 bg-transparent border-b border-brand-green text-center text-sm uppercase outline-none" 
+                        class="w-8 bg-transparent border-b border-accent text-center text-sm uppercase outline-none" 
                         maxlength="1"
                       />
                     </div>
@@ -249,7 +255,7 @@
                       <kbd class="px-2 py-1 bg-border-dark rounded text-[10px] font-mono">⌘</kbd>
                       <input 
                         bind:value={settingsState.current.keyboard.closeSession}
-                        class="w-8 bg-transparent border-b border-brand-green text-center text-sm uppercase outline-none" 
+                        class="w-8 bg-transparent border-b border-accent text-center text-sm uppercase outline-none" 
                         maxlength="1"
                       />
                     </div>
@@ -266,7 +272,7 @@
                     <p class="text-xs text-neutral-dark mt-1">Show a toast when a session connects or disconnects.</p>
                   </div>
                   <button 
-                    class="w-10 h-5 rounded-full transition-colors relative {settingsState.current.notifications.connectionAlerts ? 'bg-brand-green' : 'bg-neutral-dark'}"
+                    class="w-10 h-5 rounded-full transition-colors relative {settingsState.current.notifications.connectionAlerts ? 'bg-accent' : 'bg-neutral-dark'}"
                     onclick={() => settingsState.current.notifications.connectionAlerts = !settingsState.current.notifications.connectionAlerts}
                     aria-label="Toggle Connection Alerts"
                     aria-pressed={settingsState.current.notifications.connectionAlerts}
@@ -278,7 +284,7 @@
             </div>
           {:else if activeTab === 'about'}
             <div class="h-full flex flex-col items-center justify-center text-center space-y-6">
-              <div class="w-20 h-20 text-brand-green">
+              <div class="w-20 h-20 text-accent">
                 <svg viewBox="0 0 24 24" class="w-full h-full fill-current" xmlns="http://www.w3.org/2000/svg">
                   <path d="M21.362 9.354H12V.396L2.638 14.646H12v8.958z"/>
                 </svg>

@@ -2,13 +2,14 @@
   import Terminal from '$lib/components/Terminal.svelte';
   import { invoke } from '@tauri-apps/api/core';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { X, Plus, Terminal as TerminalIcon, HardDrive, FolderOpen, Activity } from 'lucide-svelte';
+  import { X, Plus, Terminal as TerminalIcon, HardDrive, FolderOpen, Activity, Loader2 } from 'lucide-svelte';
   import { toast } from 'svelte-sonner';
   import { onMount } from 'svelte';
   import { uiState } from '$lib/state.svelte';
   import { settingsState } from '$lib/settings.svelte';
 
   import { sessionState } from '$lib/session.svelte';
+  import { modal } from '$lib/actions/modal';
 
   let newHost = $state({
     name: '',
@@ -153,11 +154,17 @@
     <div
       role="button"
       tabindex="0"
-      class="tab {sessionState.activeSessionId === session.id ? 'active' : ''}"
+      class="tab {sessionState.activeSessionId === session.id ? 'active' : ''} {session.status === 'error' ? 'tab-error' : ''}"
       onclick={() => sessionState.activeSessionId = session.id}
       onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') sessionState.activeSessionId = session.id; }}
     >
-      <TerminalIcon size={12} class={sessionState.activeSessionId === session.id ? 'text-brand-green' : ''} />
+      {#if session.status === 'connecting'}
+        <Loader2 size={12} class="animate-spin text-accent" />
+      {:else if session.status === 'error'}
+        <span class="w-2 h-2 rounded-full bg-[#ea4e5b] shrink-0" title="Connection failed"></span>
+      {:else}
+        <TerminalIcon size={12} class={sessionState.activeSessionId === session.id ? 'text-accent' : ''} />
+      {/if}
       <span class="truncate">{session.name}</span>
       <button
         type="button"
@@ -181,7 +188,7 @@
   {#if sessionState.sessions.length === 0}
     <div class="absolute inset-0 flex flex-col items-center justify-center text-neutral-mid gap-12 bg-surface-dark">
       <div class="flex flex-col items-center">
-        <div class="w-16 h-16 mb-8 text-brand-green">
+        <div class="w-16 h-16 mb-8 text-accent">
           <svg viewBox="0 0 24 24" class="w-full h-full fill-current" xmlns="http://www.w3.org/2000/svg">
             <path d="M21.362 9.354H12V.396L2.638 14.646H12v8.958z"/>
           </svg>
@@ -198,11 +205,11 @@
         <div class="card flex flex-col gap-4 border-border-dark hover:border-border-std transition-colors">
           <div class="mono-label">Quick Connect</div>
           <div class="flex flex-col gap-2">
-            <button type="button" class="w-full flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std group cursor-pointer hover:border-brand-green/30" onclick={() => uiState.isPaletteOpen = true}>
+            <button type="button" class="w-full flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std group cursor-pointer hover:border-accent/30" onclick={() => uiState.isPaletteOpen = true}>
               <span class="text-sm">Search Saved Hosts</span>
               <kbd class="text-[10px] text-neutral-dark font-mono group-hover:text-neutral-mid uppercase">{modKey}{settingsState.current.keyboard.commandPalette}</kbd>
             </button>
-            <button type="button" class="w-full flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std group cursor-pointer hover:border-brand-green/30" onclick={() => uiState.showAddHost = true}>
+            <button type="button" class="w-full flex justify-between items-center bg-surface-near-black border border-border-dark px-3 py-2 rounded-std group cursor-pointer hover:border-accent/30" onclick={() => uiState.showAddHost = true}>
               <span class="text-sm">Create New Session</span>
               <kbd class="text-[10px] text-neutral-dark font-mono group-hover:text-neutral-mid uppercase">{modKey}{settingsState.current.keyboard.newSession}</kbd>
             </button>
@@ -227,25 +234,37 @@
   {:else}
     {#each sessionState.sessions as session (session.id)}
       <div class="h-full {sessionState.activeSessionId === session.id ? 'block' : 'hidden'}">
-        <Terminal
-          visible={sessionState.activeSessionId === session.id}
-          autoConnectId={session.id}
-        />
-        
-        <!-- Status Overlay -->
-        {#if sessionState.healthData[session.id]}
-          <div class="absolute bottom-6 right-6 flex gap-3 pointer-events-none">
-            <div class="bg-surface-near-black/80 backdrop-blur-md border border-border-std rounded-comfortable px-3 py-1.5 flex items-center gap-2 text-[11px]">
-              <Activity size={10} class="text-brand-green" />
-              <span class="text-neutral-mid uppercase tracking-wider font-mono">CPU</span>
-              <span class="font-mono text-neutral-off-white">{sessionState.healthData[session.id].cpu}%</span>
-            </div>
-            <div class="bg-surface-near-black/80 backdrop-blur-md border border-border-std rounded-comfortable px-3 py-1.5 flex items-center gap-2 text-[11px]">
-              <HardDrive size={10} class="text-brand-link" />
-              <span class="text-neutral-mid uppercase tracking-wider font-mono">RAM</span>
-              <span class="font-mono text-neutral-off-white">{sessionState.healthData[session.id].ram}%</span>
-            </div>
+        {#if session.status === 'connecting'}
+          <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-surface-dark text-neutral-mid">
+            <Loader2 size={32} class="animate-spin text-accent" />
+            <span class="font-mono text-xs uppercase tracking-widest">Connecting to {session.name}…</span>
           </div>
+        {:else if session.status === 'error'}
+          <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-surface-dark text-neutral-mid">
+            <span class="w-3 h-3 rounded-full bg-[#ea4e5b]"></span>
+            <span class="font-mono text-xs uppercase tracking-widest">Connection to {session.name} failed</span>
+          </div>
+        {:else}
+          <Terminal
+            visible={sessionState.activeSessionId === session.id}
+            autoConnectId={session.id}
+          />
+
+          <!-- Status Overlay -->
+          {#if sessionState.healthData[session.id]}
+            <div class="absolute bottom-6 right-6 flex gap-3 pointer-events-none">
+              <div class="bg-surface-near-black/80 backdrop-blur-md border border-border-std rounded-comfortable px-3 py-1.5 flex items-center gap-2 text-[11px]">
+                <Activity size={10} class="text-accent" />
+                <span class="text-neutral-mid uppercase tracking-wider font-mono">CPU</span>
+                <span class="font-mono text-neutral-off-white">{sessionState.healthData[session.id].cpu}%</span>
+              </div>
+              <div class="bg-surface-near-black/80 backdrop-blur-md border border-border-std rounded-comfortable px-3 py-1.5 flex items-center gap-2 text-[11px]">
+                <HardDrive size={10} class="text-accent-link" />
+                <span class="text-neutral-mid uppercase tracking-wider font-mono">RAM</span>
+                <span class="font-mono text-neutral-off-white">{sessionState.healthData[session.id].ram}%</span>
+              </div>
+            </div>
+          {/if}
         {/if}
       </div>
     {/each}
@@ -256,8 +275,16 @@
 {#if uiState.showAddHost}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="fixed inset-0 z-[101] flex items-center justify-center bg-black/60 backdrop-blur-sm" onclick={() => uiState.showAddHost = false}>
-    <div class="bg-surface-dark border border-border-std rounded-large w-[480px] shadow-2xl overflow-hidden" onclick={(e) => e.stopPropagation()}>
+  <div class="fixed inset-0 z-[101] flex items-center justify-center bg-black/60 backdrop-blur-sm" onclick={() => { uiState.showAddHost = false; resetNewHost(); }}>
+    <div
+      class="bg-surface-dark border border-border-std rounded-large w-[480px] shadow-2xl overflow-hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="New SSH Connection"
+      tabindex="-1"
+      use:modal={{ onClose: () => { uiState.showAddHost = false; resetNewHost(); } }}
+      onclick={(e) => e.stopPropagation()}
+    >
       <div class="px-6 py-4 border-b border-border-dark flex justify-between items-center">
         <h3 class="card-title text-[18px]">New SSH Connection</h3>
         <button onclick={() => uiState.showAddHost = false} class="text-neutral-mid hover:text-neutral-off-white transition-colors"><X size={18} /></button>
@@ -266,20 +293,20 @@
       <div class="p-6 space-y-5">
         <div class="flex flex-col gap-1.5">
           <label for="host-name" class="mono-label text-[10px]">Session Label</label>
-          <input id="host-name" bind:value={newHost.name} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="e.g. Production API" />
+          <input id="host-name" bind:value={newHost.name} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-accent/50 transition-colors" placeholder="e.g. Production API" />
         </div>
         <div class="flex flex-col gap-1.5">
           <label for="host-ip" class="mono-label text-[10px]">Host Address</label>
-          <input id="host-ip" bind:value={newHost.ip} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="10.0.1.1 or example.com" />
+          <input id="host-ip" bind:value={newHost.ip} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-accent/50 transition-colors" placeholder="10.0.1.1 or example.com" />
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1.5">
             <label for="host-user" class="mono-label text-[10px]">Username</label>
-            <input id="host-user" bind:value={newHost.username} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="root" />
+            <input id="host-user" bind:value={newHost.username} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-accent/50 transition-colors" placeholder="root" />
           </div>
           <div class="flex flex-col gap-1.5">
             <label for="host-port" class="mono-label text-[10px]">Port</label>
-            <input id="host-port" type="number" bind:value={newHost.port} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="22" />
+            <input id="host-port" type="number" bind:value={newHost.port} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-accent/50 transition-colors" placeholder="22" />
           </div>
         </div>
         <div class="flex flex-col gap-2 pt-2 border-t border-border-dark">
@@ -287,21 +314,21 @@
           <div class="grid grid-cols-2 gap-2">
             <button
               type="button"
-              class="py-2 border text-xs rounded-std transition-colors {newHost.authType === 'password' ? 'border-brand-green bg-brand-green/5 text-neutral-off-white' : 'border-border-dark bg-surface-near-black text-neutral-mid hover:border-border-std'}"
+              class="py-2 border text-xs rounded-std transition-colors {newHost.authType === 'password' ? 'border-accent bg-accent/5 text-neutral-off-white' : 'border-border-dark bg-surface-near-black text-neutral-mid hover:border-border-std'}"
               onclick={() => newHost.authType = 'password'}
             >Password</button>
             <button
               type="button"
-              class="py-2 border text-xs rounded-std transition-colors {newHost.authType === 'key' ? 'border-brand-green bg-brand-green/5 text-neutral-off-white' : 'border-border-dark bg-surface-near-black text-neutral-mid hover:border-border-std'}"
+              class="py-2 border text-xs rounded-std transition-colors {newHost.authType === 'key' ? 'border-accent bg-accent/5 text-neutral-off-white' : 'border-border-dark bg-surface-near-black text-neutral-mid hover:border-border-std'}"
               onclick={() => newHost.authType = 'key'}
             >Private Key</button>
           </div>
 
           {#if newHost.authType === 'password'}
-            <input id="host-pass" type="password" bind:value={newHost.password} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="Password" />
+            <input id="host-pass" type="password" bind:value={newHost.password} class="w-full bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-accent/50 transition-colors" placeholder="Password" />
           {:else}
             <div class="flex gap-2">
-              <input bind:value={newHost.keyPath} class="flex-1 bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-brand-green/50 transition-colors" placeholder="~/.ssh/id_rsa" />
+              <input bind:value={newHost.keyPath} class="flex-1 bg-surface-near-black border border-border-dark rounded-std px-3 py-2 text-sm outline-none focus:border-accent/50 transition-colors" placeholder="~/.ssh/id_rsa" />
               <button type="button" class="px-3 bg-surface-near-black border border-border-dark rounded-std text-xs hover:border-border-std flex items-center gap-1.5" onclick={browseKeyPath}>
                 <FolderOpen size={14} />
                 <span>Browse</span>

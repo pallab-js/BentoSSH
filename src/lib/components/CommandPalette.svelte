@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Search, Command, ArrowRight, Zap, Server } from 'lucide-svelte';
   import { fade, fly } from 'svelte/transition';
+  import { modal } from '$lib/actions/modal';
 
   interface Item {
     id: string;
@@ -65,7 +66,7 @@
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="command-palette-overlay" onclick={() => onclose()} transition:fade={{ duration: 150 }}>
-    <div class="command-palette" onclick={(e) => e.stopPropagation()} transition:fly={{ y: -20, duration: 200 }}>
+    <div class="command-palette" role="dialog" aria-modal="true" aria-label="Command palette" tabindex="-1" use:modal={{ onClose: onclose }} onclick={(e) => e.stopPropagation()} transition:fly={{ y: -20, duration: 200 }}>
       <div class="flex items-center px-4 gap-3 border-b border-border-dark">
         <Search size={20} class="text-neutral-dark" />
         <input
@@ -94,9 +95,9 @@
             >
               <div class="flex items-center gap-3">
                 {#if item.type === 'host'}
-                  <Server size={16} class={i === selectedIndex ? 'text-neutral-off-white' : 'text-brand-green'} />
+                  <Server size={16} class={i === selectedIndex ? 'text-neutral-off-white' : 'text-accent'} />
                 {:else}
-                  <Zap size={16} class={i === selectedIndex ? 'text-neutral-off-white' : 'text-brand-link'} />
+                  <Zap size={16} class={i === selectedIndex ? 'text-neutral-off-white' : 'text-accent-link'} />
                 {/if}
                 <div class="flex flex-col">
                   <span class="font-normal text-neutral-off-white">{item.name}</span>
